@@ -17,9 +17,9 @@ jobs:
         with:
           python-version: '3.10'
 
-      - name: Instalar librerías necesarias
+   - name: Instalar librerías necesarias
         run: |
-          pip install office365-python-client Pillow
+          pip install Office365-REST-Python-Client Pillow
 
       - name: Ejecutar el script
         env:
