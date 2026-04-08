@@ -8,7 +8,8 @@ from urllib.parse import urlparse, unquote
 from datetime import datetime
 from PIL import Image
 from office365.sharepoint.client_context import ClientContext
-from office365.runtime.auth.user_credential import UserCredential
+# Cambio 1: Importamos ClientCredential en lugar de UserCredential
+from office365.runtime.auth.client_credential import ClientCredential
 
 # ==========================================
 # 1. CONFIGURACIÓN PARA GITHUB ACTIONS
@@ -16,9 +17,9 @@ from office365.runtime.auth.user_credential import UserCredential
 SITE_URL = "https://teams.wal-mart.com/sites/EquipoPlanificacin"
 LIST_NAME = "Seguimiento Infraestructura"
 
-# Las credenciales ahora se jalan desde los Secrets de GitHub de forma segura
-USERNAME = os.environ.get("SP_USER")
-PASSWORD = os.environ.get("SP_PASS") 
+# Cambio 2: Jalamos las variables de Azure desde los Secrets de GitHub
+CLIENT_ID = os.environ.get("AZURE_CLIENT_ID")
+CLIENT_SECRET = os.environ.get("AZURE_CLIENT_SECRET")
 
 # Para GitHub Pages, el archivo debe llamarse index.html y guardarse en la raíz
 OUTPUT_HTML = "index.html"
@@ -95,7 +96,8 @@ def extraer_foto_columna(ctx, p, col_name, item_id):
 def main():
     try:
         print("🚀 INICIANDO EXTRACCIÓN MAESTRA...")
-        ctx = ClientContext(SITE_URL).with_credentials(UserCredential(USERNAME, PASSWORD))
+        # Cambio 3: Autenticamos usando ClientCredential en lugar de UserCredential
+        ctx = ClientContext(SITE_URL).with_credentials(ClientCredential(CLIENT_ID, CLIENT_SECRET))
         sp_list = ctx.web.lists.get_by_title(LIST_NAME)
         
         print("   ⏳ Solicitando registros y adjuntos a SharePoint...")
