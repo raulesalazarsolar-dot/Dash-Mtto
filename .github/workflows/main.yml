@@ -2,7 +2,7 @@ name: Actualizar Dashboard MTTO
 
 on:
   schedule:
-    - cron: '*/5 * * * *'
+    - cron: '* * * * *'
   workflow_dispatch:
 
 # ESTO ES LO NUEVO: Le da permiso a GitHub Actions para guardar la página web
