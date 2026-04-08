@@ -27,8 +27,8 @@ jobs:
 
       - name: Ejecutar el script
         env:
-          SP_USER: ${{ secrets.SP_USER }}
-          SP_PASS: ${{ secrets.SP_PASS }}
+          AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+          AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
         run: python main.py 
 
       - name: Publicar el HTML en GitHub Pages
