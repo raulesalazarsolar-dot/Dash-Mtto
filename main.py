@@ -1,34 +1,23 @@
-import io
-import base64
-import json
 import os
-import time
+import json
 import unicodedata
-from urllib.parse import urlparse, unquote
 from datetime import datetime
-from PIL import Image
-from office365.sharepoint.client_context import ClientContext
-# Cambio 1: Importamos ClientCredential en lugar de UserCredential
-from office365.runtime.auth.client_credential import ClientCredential
+import pandas as pd
 
 # ==========================================
-# 1. CONFIGURACIÓN PARA GITHUB ACTIONS
+# 1. CONFIGURACIÓN GOOGLE DRIVE / GITHUB
 # ==========================================
-SITE_URL = "https://teams.wal-mart.com/sites/EquipoPlanificacin"
-LIST_NAME = "Seguimiento Infraestructura"
+GDRIVE_FILE_ID = "16uSilZ3IKizJ0GjO4YeatrrswdoVfw_B"
+CSV_URL = f"https://drive.google.com/uc?export=download&id={GDRIVE_FILE_ID}"
 
-# Cambio 2: Jalamos las variables de Azure desde los Secrets de GitHub
-CLIENT_ID = os.environ.get("AZURE_CLIENT_ID")
-CLIENT_SECRET = os.environ.get("AZURE_CLIENT_SECRET")
-
-# Para GitHub Pages, el archivo debe llamarse index.html y guardarse en la raíz
+# Archivo de salida para GitHub Pages
 OUTPUT_HTML = "index.html"
 
 # ==========================================
-# 2. UTILIDADES Y "SABUESO DE FOTOS"
+# 2. UTILIDADES DE LIMPIEZA
 # ==========================================
 def limpiar(val):
-    if val is None: return ""
+    if pd.isna(val) or val is None: return ""
     s = str(val).strip()
     if s == "0" or s == "0.0": return "0"
     if s.lower() == "nan": return "" 
@@ -40,112 +29,76 @@ def normalizar_texto(texto):
     return ''.join(c for c in unicodedata.normalize('NFD', s) if unicodedata.category(c) != 'Mn')
 
 def formatear_fecha(texto_fecha):
-    if not texto_fecha: return "--"
+    if not texto_fecha or pd.isna(texto_fecha): return "--"
     try:
         s_fecha = str(texto_fecha)
-        if "T" in s_fecha: return datetime.strptime(s_fecha.split("T")[0], "%Y-%m-%d").strftime("%d-%m-%Y")
-        if isinstance(texto_fecha, datetime): return texto_fecha.strftime("%d-%m-%Y")
         if " " in s_fecha: return s_fecha.split(" ")[0]
         return s_fecha
     except: return str(texto_fecha)
 
-def descargar_foto_por_url(ctx, url):
-    try:
-        url = unquote(url)
-        if url.startswith("http"): url = urlparse(url).path
-        
-        file_content = io.BytesIO()
-        ctx.web.get_file_by_server_relative_url(url).download(file_content).execute_query()
-        file_content.seek(0)
-        
-        if len(file_content.getvalue()) > 0:
-            with Image.open(file_content) as img:
-                if img.mode != "RGB": img = img.convert("RGB")
-                # Escalado a 600x600
-                img.thumbnail((600, 600))
-                buf = io.BytesIO()
-                # Compresión a 60 
-                img.save(buf, format='JPEG', quality=60)
-                return f"data:image/jpeg;base64,{base64.b64encode(buf.getvalue()).decode('utf-8')}"
-    except Exception:
-        pass
-    return None
-
-def extraer_foto_columna(ctx, p, col_name, item_id):
-    """Extrae la imagen específicamente de la columna indicada (Antes o Despues)"""
-    img_b64 = None
-    json_raw = p.get(col_name)
-    if json_raw:
-        try:
-            data = json.loads(json_raw) if isinstance(json_raw, str) else json_raw
-            if isinstance(data, dict):
-                url = data.get("serverRelativeUrl") or data.get("serverUrl") or data.get("Url")
-                filename = data.get("fileName")
-                if url: 
-                    img_b64 = descargar_foto_por_url(ctx, url)
-                if not img_b64 and filename:
-                    rel_site = SITE_URL.replace("https://teams.wal-mart.com", "")
-                    url_adj = f"{rel_site}/Lists/{LIST_NAME}/Attachments/{item_id}/{filename}"
-                    img_b64 = descargar_foto_por_url(ctx, url_adj)
-        except: pass
-    return img_b64
-
 # ==========================================
-# 3. EXTRACCIÓN PRINCIPAL
+# 3. EXTRACCIÓN Y PROCESAMIENTO DEL CSV
 # ==========================================
 def main():
+    print("🚀 INICIANDO EXTRACCIÓN DESDE GOOGLE DRIVE...")
+    
     try:
-        print("🚀 INICIANDO EXTRACCIÓN MAESTRA...")
-        # Cambio 3: Autenticamos usando ClientCredential en lugar de UserCredential
-        ctx = ClientContext(SITE_URL).with_credentials(ClientCredential(CLIENT_ID, CLIENT_SECRET))
-        sp_list = ctx.web.lists.get_by_title(LIST_NAME)
+        # Descargamos y leemos el CSV
+        df = pd.read_csv(CSV_URL, encoding='utf-8')
         
-        print("   ⏳ Solicitando registros y adjuntos a SharePoint...")
+        # Limpiamos los espacios en blanco de los encabezados
+        df.columns = df.columns.str.strip()
         
-        columnas_req = [
-            "Id", "Title", "LinkTitle", "field_2", "field_3", "field_4", 
-            "field_5", "field_6", "field_7", "Responsable", "field_10", 
-            "field_11", "field_14", "field_15", "Antes", "Despues", 
-            "field_1", "ClaseM", "Zona", "Attachments", "AttachmentFiles"
-        ]
-        
-        try:
-            items = sp_list.items.select(columnas_req).expand(["AttachmentFiles"]).top(5000).get().execute_query()
-        except Exception:
-            columnas_req.remove("AttachmentFiles")
-            items = sp_list.items.select(columnas_req).top(5000).get().execute_query()
-            
-        total_main = len(items)
-        print(f"   ✅ Se descargaron {total_main} registros brutos.")
-        
-        db_json = {}
-        for idx, item in enumerate(items):
-            print(f"      ... Procesando OT {idx+1} de {total_main}", end='\r')
-            p = item.properties
-            item_id = int(p.get("Id", 0))
-            
-            semana_val = limpiar(p.get("field_1"))
-            if semana_val not in ["14"]:
-                continue 
+        total_main = len(df)
+        print(f" ✅ Se cargaron {total_main} registros del CSV.")
 
-            act_str = limpiar(p.get("field_4")) 
-            tag_id = limpiar(p.get("LinkTitle"))
+        # Mapeo con los nombres de las columnas (ya limpios de espacios)
+        MAPEO = {
+            "id": "ID", 
+            "semana": "Semana",
+            "actividad": "Actividad",
+            "titulo": "Tag", 
+            "status": "Status", 
+            "prioridad": "Prioridad", 
+            "ejecutor": "Responsable", 
+            "ubicacion": "Ubicación",      # Ajustado sin espacio final
+            "sub_ubi": "Sub Ubicación",    # Ajustado sin espacio final
+            "ot": "OT", 
+            "zona": "Zona", 
+            "f_lev": "Levantamiento",
+            "f_cie": "Cierre",
+            "observacion": "Observación",  # Ajustado sin espacio final
+            "obs2": "Observación 2", 
+            "clase": "Clase M" 
+        }
+
+        db_json = {}
+        for idx, row in df.iterrows():
+            print(f"   ... Procesando OT {idx+1} de {total_main}", end='\r')
+            
+            item_id = int(row.get(MAPEO["id"], idx + 1)) if not pd.isna(row.get(MAPEO["id"])) else idx + 1
+            
+            semana_val = limpiar(row.get(MAPEO["semana"]))
+
+            act_str = limpiar(row.get(MAPEO["actividad"]))
+            tag_id = limpiar(row.get(MAPEO["titulo"]))
             titulo_final = act_str if act_str else (tag_id or f"OT #{item_id}")
 
-            status_txt = normalizar_texto(limpiar(p.get("field_11"))) 
+            status_txt = normalizar_texto(limpiar(row.get(MAPEO["status"]))) 
             if any(k in status_txt for k in ['ok', 'listo', 'cerrad', 'realiza', 'complet']): status = "realizada"
             elif any(k in status_txt for k in ['prog', 'planif']): status = "programado"
             elif any(k in status_txt for k in ['proceso', 'tratando', 'curso']): status = "en proceso"
             else: status = "pendiente"
 
-            prio_raw = normalizar_texto(limpiar(p.get("field_10"))) 
+            prio_raw = normalizar_texto(limpiar(row.get(MAPEO["prioridad"]))) 
             if "calavera" in prio_raw or "0" in prio_raw: prio = "0"
             elif "alta" in prio_raw or "1" in prio_raw: prio = "1"
             elif "media" in prio_raw or "2" in prio_raw: prio = "2"
             else: prio = "3"
 
-            img_antes = extraer_foto_columna(ctx, p, "Antes", item_id)
-            img_despues = extraer_foto_columna(ctx, p, "Despues", item_id)
+            # Rescatamos la clase directamente desde el CSV
+            clase_str = limpiar(row.get(MAPEO["clase"])).title()
+            clase_final = clase_str if clase_str and clase_str.lower() != "none" else "General"
 
             key_id = f"MTTO_{item_id}"
             db_json[key_id] = {
@@ -154,28 +107,31 @@ def main():
                 "titulo": titulo_final,
                 "tag": tag_id,
                 "semana": semana_val or "S/N",
-                "ejecutor": limpiar(p.get("Responsable")) or "Sin Asignar",
+                "ejecutor": limpiar(row.get(MAPEO["ejecutor"])) or "Sin Asignar",
                 "prioridad": prio,
-                "ubicacion": limpiar(p.get("field_5")),
-                "sub_ubi": limpiar(p.get("field_6")),
-                "ot": limpiar(p.get("field_7")),
-                "zona": limpiar(p.get("Zona")),
-                "f_lev": formatear_fecha(p.get("field_2")),
-                "f_cie": formatear_fecha(p.get("field_3")),
+                "ubicacion": limpiar(row.get(MAPEO["ubicacion"])),
+                "sub_ubi": limpiar(row.get(MAPEO["sub_ubi"])),
+                "ot": limpiar(row.get(MAPEO["ot"])),
+                "zona": limpiar(row.get(MAPEO["zona"])),
+                "f_lev": formatear_fecha(row.get(MAPEO["f_lev"])),
+                "f_cie": formatear_fecha(row.get(MAPEO["f_cie"])),
                 "actividad": act_str or "Sin descripción",
-                "observacion": limpiar(p.get("field_14")),
-                "obs2": limpiar(p.get("field_15")),
+                "observacion": limpiar(row.get(MAPEO["observacion"])),
+                "obs2": limpiar(row.get(MAPEO["obs2"])),
                 "status": status,
-                "clase": limpiar(p.get("ClaseM")).title() or "General",
+                "clase": clase_final,
                 "origen": "act",
-                "img_antes": img_antes,
-                "img_despues": img_despues
+                "img_antes": None,  
+                "img_despues": None 
             }
             
-        print("\n   ✅ Procesamiento finalizado. Construyendo HTML...")
+        print("\n ✅ Procesamiento finalizado. Construyendo HTML...")
         generar_html_moderno(db_json)
 
-    except Exception as e: print(f"\n❌ Error Fatal: {e}")
+    except Exception as e: 
+        print(f"\n❌ Error Fatal: {e}")
+        import traceback
+        traceback.print_exc()
 
 # ==========================================
 # 4. GENERADOR HTML
@@ -206,7 +162,6 @@ def generar_html_moderno(db_json):
         
         .col-filters { width: 280px; background: #fff; border-right: 1px solid var(--border); display: flex; flex-direction: column; flex-shrink: 0; z-index: 5; }
         
-        /* Modificado para alojar el botón de borrar de manera elegante */
         .filters-header { padding: 15px 20px; border-bottom: 1px solid var(--border); font-weight: 700; color: var(--primary); font-size: 0.9rem; text-transform: uppercase; background: #f8fafc; display: flex; justify-content: space-between; align-items: center; }
         
         .filters-body { flex: 1; overflow-y: auto; padding: 20px; min-height: 0; } 
@@ -216,7 +171,6 @@ def generar_html_moderno(db_json):
         .f-group label { font-size: 0.75rem; font-weight: 700; color: var(--muted); display: block; margin-bottom: 6px; text-transform: uppercase; }
         select, input { width: 100%; padding: 10px; border: 1px solid var(--border); border-radius: 6px; font-size: 0.85rem; color: var(--text); }
         select:focus, input:focus { border-color: var(--accent); box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.1); }
-        .range-box { display: flex; align-items: center; gap: 5px; }
         
         .btn-clean { background: white; border: 1px solid var(--danger); color: var(--danger); padding: 10px; border-radius: 6px; cursor: pointer; font-weight: 700; transition: 0.2s; width: 100%; text-transform: uppercase; font-size: 0.8rem; letter-spacing: 0.5px; }
         .btn-clean:hover { background: var(--danger); color: white; }
@@ -228,7 +182,6 @@ def generar_html_moderno(db_json):
         .progress-bar-container { width: 100%; height: 10px; background: #e2e8f0; border-radius: 5px; overflow: hidden; }
         .progress-bar-fill { height: 100%; background: var(--success); width: 0%; transition: width 1s cubic-bezier(0.4, 0, 0.2, 1); }
         
-        /* LISTA OT */
         .col-list { width: 380px; background: #fff; border-right: 1px solid var(--border); display: flex; flex-direction: column; flex-shrink: 0; }
         .list-header { padding: 20px; border-bottom: 1px solid var(--border); font-weight: 600; background: #f8fafc; color: var(--secondary); font-size: 0.9rem; flex-shrink: 0; display:flex; flex-direction:column; gap:12px; }
         .list-scroll-area { flex: 1; overflow-y: auto; min-height: 0; }
@@ -242,7 +195,6 @@ def generar_html_moderno(db_json):
         .tag { padding: 4px 8px; border-radius: 4px; font-weight: 700; font-size: 0.7rem; letter-spacing: 0.3px; }
         .st-ok { background: #dcfce7; color: #166534; } .st-pend { background: #fee2e2; color: #991b1b; } .st-prog { background: #e0f2fe; color: #075985; } .st-proc { background: #fef3c7; color: #92400e; }
         
-        /* DETALLE */
         .col-detail { flex: 1; background: #f1f5f9; overflow-y: auto; padding: 40px; }
         .empty-state { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; color: var(--muted); opacity: 0.7; }
         .detail-content { background: white; border-radius: 12px; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1); overflow: hidden; max-width: 1000px; margin: 0 auto; border: 1px solid var(--border); }
@@ -258,7 +210,6 @@ def generar_html_moderno(db_json):
         .obs-box h4 { margin: 0 0 12px; color: var(--secondary); font-size: 0.9rem; text-transform: uppercase; }
         .obs-box p { background: #f8fafc; padding: 20px; border-radius: 8px; border: 1px solid var(--border); margin: 0; line-height: 1.6; color: #334155; }
         
-        /* GALERÍA ANTES/DESPUÉS */
         .gallery-section { padding: 30px; background: #f8fafc; display:flex; flex-direction: column; align-items: center; gap: 15px; }
         .gallery-section h4 { margin:0; color:var(--secondary); font-size:0.9rem; text-transform:uppercase; align-self: flex-start; }
         .gallery-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; width: 100%; }
@@ -267,7 +218,6 @@ def generar_html_moderno(db_json):
         .gal-img { max-width: 100%; max-height: 350px; border-radius: 6px; cursor: zoom-in; box-shadow: 0 2px 5px rgba(0,0,0,0.1); transition: transform 0.2s; object-fit: contain; }
         .gal-img:hover { transform: scale(1.02); }
         
-        /* CSS DE GRÁFICOS */
         .graficos-layout { flex: 1; padding: 30px; display: grid; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); grid-auto-rows: min-content; gap: 25px; overflow-y: auto; background: #f1f5f9; align-content: start; }
         .chart-card { background: white; padding: 25px; border-radius: 12px; border: 1px solid var(--border); box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); display: flex; flex-direction: column; height: 400px; width: 100%; }
         .chart-card.wide { grid-column: 1 / -1; height: 450px; }
@@ -280,7 +230,6 @@ def generar_html_moderno(db_json):
         .p-med { background: #fef3c7; color: #d97706; border: 1px solid #fcd34d; }
         .p-baja { background: #f1f5f9; color: #64748b; border: 1px solid #cbd5e1; }
         
-        /* Modals */
         .modal { display: none; position: fixed; z-index: 2000; left: 0; top: 0; width: 100%; height: 100%; background: rgba(15, 23, 42, 0.85); align-items: center; justify-content: center; backdrop-filter: blur(4px); }
         .modal img { max-width: 90%; max-height: 90vh; border-radius: 8px; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.5); }
         
@@ -314,7 +263,7 @@ def generar_html_moderno(db_json):
 
     <div class="top-bar">
         <div class="brand"><h2>⚙️ Panel Gestión de Actividades <span>SubGerencia de Mantenimiento</span></h2></div>
-        <div style="font-size:0.85rem; font-weight:600; opacity:0.9;">Actualizado: __FECHA_ACTUAL__ | Semanas 14</div>
+        <div style="font-size:0.85rem; font-weight:600; opacity:0.9;">Actualizado: __FECHA_ACTUAL__</div>
     </div>
     
     <div class="tabs-container">
@@ -407,7 +356,7 @@ def generar_html_moderno(db_json):
             <div style="display:flex; gap:25px; margin-bottom:30px; flex-wrap:wrap;">
                 <div class="chart-card" style="flex:1; height:350px; min-width:300px;"><div class="chart-title">Distribución Mantenimiento vs Aseo</div><div class="canvas-container"><canvas id="row_chart1"></canvas></div></div>
                 <div class="chart-card" style="flex:1; height:350px; min-width:300px;"><div class="chart-title">Cumplimiento Mantenimiento General</div><div class="canvas-container"><canvas id="row_chart2"></canvas></div></div>
-                <div class="chart-card" style="flex:1; height:350px; min-width:300px;"><div class="chart-title">Cumplimiento Aseo General</div><div class="canvas-container"><canvas id="row_chart3"></canvas></div></div>
+                <div class="chart-card" style="flex:1; height:350px; min-width:300px;"><div class="chart-title">Cumplimiento Aseo/Limpieza General</div><div class="canvas-container"><canvas id="row_chart3"></canvas></div></div>
             </div>
             
             <div style="display:flex; gap:25px; flex-wrap:wrap;">
@@ -616,14 +565,14 @@ def generar_html_moderno(db_json):
             htmlImgs += `<div class="gal-box"><span>📸 Antes</span><img src="${d.img_antes}" class="gal-img" onclick="openModal(this.src)"></div>`;
             hasImgs = true;
         } else {
-            htmlImgs += `<div class="gal-box"><span>📸 Antes</span><div style="height:150px; display:flex; align-items:center; justify-content:center; color:#cbd5e1; font-style:italic; font-weight:600; font-size:0.9rem;">Sin foto "Antes"</div></div>`;
+            htmlImgs += `<div class="gal-box"><span>📸 Antes</span><div style="height:150px; display:flex; align-items:center; justify-content:center; color:#cbd5e1; font-style:italic; font-weight:600; font-size:0.9rem;">Sin foto (Modo GitHub)</div></div>`;
         }
 
         if (d.img_despues) {
             htmlImgs += `<div class="gal-box"><span>📸 Después</span><img src="${d.img_despues}" class="gal-img" onclick="openModal(this.src)"></div>`;
             hasImgs = true;
         } else {
-            htmlImgs += `<div class="gal-box"><span>📸 Después</span><div style="height:150px; display:flex; align-items:center; justify-content:center; color:#cbd5e1; font-style:italic; font-weight:600; font-size:0.9rem;">Sin foto "Después"</div></div>`;
+            htmlImgs += `<div class="gal-box"><span>📸 Después</span><div style="height:150px; display:flex; align-items:center; justify-content:center; color:#cbd5e1; font-style:italic; font-weight:600; font-size:0.9rem;">Sin foto (Modo GitHub)</div></div>`;
         }
         htmlImgs += '</div>';
 
@@ -742,10 +691,11 @@ def generar_html_moderno(db_json):
         XLSX.writeFile(workbook, `Reporte_MTTO_${fechaEx}.xlsx`);
     }
 
+    // LÓGICA CORREGIDA PARA DETECTAR ASEO / LIMPIEZA
     const isAseoAct = (d) => {
         let textMatch = (d.ubicacion + " " + (d.sub_ubi || "") + " " + (d.titulo || "")).toLowerCase();
         let claseL = (d.clase || '').toLowerCase();
-        return textMatch.includes('aseo') || claseL.includes('aseo');
+        return textMatch.includes('aseo') || textMatch.includes('limpieza') || claseL.includes('aseo') || claseL.includes('limpieza');
     };
 
     const getPLoc = (d) => {
@@ -818,7 +768,7 @@ def generar_html_moderno(db_json):
         let summaryHtml = `
             <div class="summary-block">
                 <div class="summary-header">
-                    <span class="summary-title" style="color:#3b82f6;">🧹 Apoyo Aseo</span>
+                    <span class="summary-title" style="color:#3b82f6;">🧹 Aseo / Limpieza</span>
                     <span class="summary-perc" style="color:${colAseo};">${percAseo}%</span>
                 </div>
                 <div class="summary-sub">De un total de <b>${totAseo}</b>, <b>${okAseo}</b> realizadas</div>
@@ -973,11 +923,11 @@ def generar_html_moderno(db_json):
         let pAseoCump = getPerc(stats.aseo.ok, stats.aseo.total);
         chartInstances['row_chart3'] = new Chart(getFreshCanvas('row_chart3'), {
             type: 'bar',
-            data: { labels: ['Cumplimiento ASEO'], datasets: [{ label: 'Cerradas', data: [pAseoCump], backgroundColor: '#3b82f6', barPercentage: 0.5, borderRadius: 6 }] },
+            data: { labels: ['Cumplimiento Aseo/Limpieza'], datasets: [{ label: 'Cerradas', data: [pAseoCump], backgroundColor: '#3b82f6', barPercentage: 0.5, borderRadius: 6 }] },
             options: { 
                 ...commonOptsRow, indexAxis: 'y', scales: { x: { max: 100, grid: {color:'#f1f5f9'} }, y: { grid: {display:false} } }, 
                 plugins: { ...commonOptsRow.plugins, legend: { display: false } },
-                onClick: (e, els, ch) => { if(els.length>0) showDataModal('Aseo (General)', d => isAseoAct(d)); }
+                onClick: (e, els, ch) => { if(els.length>0) showDataModal('Aseo / Limpieza (General)', d => isAseoAct(d)); }
             }
         });
 
@@ -1031,7 +981,6 @@ def generar_html_moderno(db_json):
     </script>
 </body></html>"""
     
-    # Inyectamos las variables de Python usando replace() de forma segura
     full_html = html_template.replace("__FECHA_ACTUAL__", fecha_actual)
     full_html = full_html.replace("__DB_JSON_DATA__", json.dumps(db_json))
     
@@ -1039,7 +988,6 @@ def generar_html_moderno(db_json):
         f.write(full_html)
         
     print(f"\n✅ REPORTE GENERADO CON ÉXITO: {OUTPUT_HTML}")
-    # Eliminamos webbrowser.open() porque en el servidor no hay pantalla
 
 if __name__ == "__main__":
     main()
