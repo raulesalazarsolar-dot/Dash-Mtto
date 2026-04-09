@@ -1,11 +1,10 @@
-name: Actualizar Dashboard MTTO
+name: Actualizar Dashboard Infra
 
 on:
   schedule:
-    - cron: '* * * * *'
+    - cron: '*/5 * * * *'
   workflow_dispatch:
 
-# ESTO ES LO NUEVO: Le da permiso a GitHub Actions para guardar la página web
 permissions:
   contents: write
 
@@ -21,14 +20,12 @@ jobs:
         with:
           python-version: '3.10'
 
-      - name: Instalar librerias necesarias
+      - name: Instalar librerías necesarias
         run: |
-          pip install Office365-REST-Python-Client Pillow
+          python -m pip install --upgrade pip
+          pip install pandas openpyxl
 
       - name: Ejecutar el script
-        env:
-          AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
-          AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
         run: python main.py 
 
       - name: Publicar el HTML en GitHub Pages
