@@ -2,6 +2,7 @@ import os
 import json
 import unicodedata
 from datetime import datetime
+from zoneinfo import ZoneInfo
 import pandas as pd
 
 # ==========================================
@@ -137,7 +138,8 @@ def main():
 # 4. GENERADOR HTML
 # ==========================================
 def generar_html_moderno(db_json):
-    fecha_actual = datetime.now().strftime("%d/%m/%Y %H:%M")
+    # AQUÍ ESTÁ EL CAMBIO DE LA OPCIÓN A:
+    fecha_actual = datetime.now(ZoneInfo("America/Santiago")).strftime("%d/%m/%Y %H:%M")
     
     html_template = """<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Dashboard Mantenimiento</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
