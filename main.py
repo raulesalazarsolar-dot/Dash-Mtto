@@ -62,13 +62,13 @@ def main():
             "status": "Status", 
             "prioridad": "Prioridad", 
             "ejecutor": "Responsable", 
-            "ubicacion": "Ubicación",      # Ajustado sin espacio final
-            "sub_ubi": "Sub Ubicación",    # Ajustado sin espacio final
+            "ubicacion": "Ubicación",      
+            "sub_ubi": "Sub Ubicación",    
             "ot": "OT", 
             "zona": "Zona", 
             "f_lev": "Levantamiento",
             "f_cie": "Cierre",
-            "observacion": "Observación",  # Ajustado sin espacio final
+            "observacion": "Observación",  
             "obs2": "Observación 2", 
             "clase": "Clase M" 
         }
@@ -97,7 +97,6 @@ def main():
             elif "media" in prio_raw or "2" in prio_raw: prio = "2"
             else: prio = "3"
 
-            # Rescatamos la clase directamente desde el CSV
             clase_str = limpiar(row.get(MAPEO["clase"])).title()
             clase_final = clase_str if clase_str and clase_str.lower() != "none" else "General"
 
@@ -338,15 +337,14 @@ def generar_html_moderno(db_json):
             
             <div class="chart-card">
                 <div class="chart-title">Resumen de Actividades</div>
-                <div id="summary_content" style="display:flex; flex-direction:column; justify-content:space-around; flex:1;">
-                </div>
+                <div id="summary_content" style="display:flex; flex-direction:column; justify-content:space-around; flex:1;"></div>
             </div>
             
-            <div class="chart-card wide"><div class="chart-title">Avance por Área</div><div class="canvas-container"><canvas id="chart5"></canvas></div></div>     
-            <div class="chart-card wide"><div class="chart-title">Top Ubicaciones Críticas</div><div class="canvas-container"><canvas id="chart4"></canvas></div></div>
-
-
             <div class="chart-card wide"><div class="chart-title">Carga Laboral por Responsable</div><div class="canvas-container"><canvas id="chart3"></canvas></div></div>
+            
+            <div class="chart-card wide"><div class="chart-title">Avance por Área</div><div class="canvas-container"><canvas id="chart5"></canvas></div></div>
+            
+            <div class="chart-card wide"><div class="chart-title">Top Ubicaciones Críticas</div><div class="canvas-container"><canvas id="chart4"></canvas></div></div>
         </div>
         
         <div id="view_row" style="display:none; flex:1; flex-direction:column; overflow-y:auto; padding:30px; background:#f1f5f9;">
@@ -403,7 +401,16 @@ def generar_html_moderno(db_json):
         html += createSelect('f_clase', '🛠️ Clase MTTO', [...new Set(records.map(x=>x.clase))].sort());
         html += createSelect('f_exec', '👷 Responsable', [...new Set(records.map(x=>x.ejecutor))].sort());
         html += createSelect('f_ubi', '🏭 Línea / Área', [...new Set(records.map(x=>x.ubicacion))].sort());
-        html += `<div class="f-group"><label>🚦 Estado</label><select id="f_status" onchange="applyFilters()"><option value="ALL">Todas las OTs</option><option value="pendientes">Pendientes / En Proceso</option><option value="realizada">Solo Cerradas (OK)</option></select></div>`;
+        
+        // FILTRO DE STATUS ACTUALIZADO CON "EN PROCESO"
+        html += `<div class="f-group"><label>🚦 Estado</label><select id="f_status" onchange="applyFilters()">
+            <option value="ALL">Todas las OTs</option>
+            <option value="abiertas">Backlog (No Cerradas)</option>
+            <option value="pendiente">Solo Pendientes</option>
+            <option value="en proceso">Solo En Proceso</option>
+            <option value="programado">Solo Programadas</option>
+            <option value="realizada">Solo Cerradas</option>
+        </select></div>`;
         
         fDiv.innerHTML = html;
     }
@@ -447,9 +454,8 @@ def generar_html_moderno(db_json):
 
         return records.filter(d => {
             if (stVal !== 'ALL') {
-                const isOk = (d.status === 'realizada');
-                if (stVal === 'realizada' && !isOk) return false;
-                if (stVal === 'pendientes' && isOk) return false;
+                if (stVal === 'abiertas' && d.status === 'realizada') return false;
+                else if (stVal !== 'abiertas' && d.status !== stVal) return false;
             }
             
             if (searchVal !== '') {
@@ -612,7 +618,7 @@ def generar_html_moderno(db_json):
         let found = datosFiltrados.length > 0;
         
         datosFiltrados.forEach(d => {
-            let stColor = d.status === 'realizada' ? '#166534' : (d.status === 'pendiente' ? '#991b1b' : '#92400e');
+            let stColor = d.status === 'realizada' ? '#166534' : (d.status === 'pendiente' ? '#991b1b' : (d.status === 'en proceso' ? '#92400e' : '#075985'));
             let idDisplay = d.ot ? d.ot : (d.tag ? d.tag : '#' + d.id_real);
             let obsText = d.observacion ? (d.observacion.length > 45 ? d.observacion.substring(0, 42) + '...' : d.observacion) : '-';
             let colText = d[colProp] || '-';
@@ -695,7 +701,6 @@ def generar_html_moderno(db_json):
         XLSX.writeFile(workbook, `Reporte_MTTO_${fechaEx}.xlsx`);
     }
 
-    // LÓGICA CORREGIDA PARA DETECTAR ASEO / LIMPIEZA
     const isAseoAct = (d) => {
         let textMatch = (d.ubicacion + " " + (d.sub_ubi || "") + " " + (d.titulo || "")).toLowerCase();
         let claseL = (d.clase || '').toLowerCase();
@@ -723,26 +728,30 @@ def generar_html_moderno(db_json):
     function drawCharts(data) {
         if(!data) return;
 
-        let stats = { ok:0, pend:0, prog:0, ex:{}, loc:{}, wCounts:{}, cCounts:{} };
+        let stats = { ok:0, pend:0, proc:0, prog:0, ex:{}, loc:{}, wCounts:{}, cCounts:{} };
         let totAseo = 0, okAseo = 0;
         let totMtto = 0, okMtto = 0;
         let totGen = data.length, okGen = 0;
         
-        // Objeto para el nuevo Gráfico de Avance por Área
         let statsArea = {
-            'Mecánico': { total: 0, ok: 0 },
-            'Autómata': { total: 0, ok: 0 },
-            'Frio': { total: 0, ok: 0 },
-            'Infraestructura': { total: 0, ok: 0 }
+            'Mecánico': { total: 0, ok: 0, proc: 0, pend: 0 },
+            'Autómata': { total: 0, ok: 0, proc: 0, pend: 0 },
+            'Frio': { total: 0, ok: 0, proc: 0, pend: 0 },
+            'Infraestructura': { total: 0, ok: 0, proc: 0, pend: 0 }
         };
 
         weeks.forEach(w => stats.wCounts[w] = {total:0, ok:0});
         
         data.forEach(d => {
             let isOk = (d.status === 'realizada');
+            let isProc = (d.status === 'en proceso');
+            let isProg = (d.status === 'programado');
+            let isPend = (d.status === 'pendiente');
+
             if(isOk) { stats.ok++; okGen++; }
-            else if(d.status === 'programado') stats.prog++;
-            else stats.pend++;
+            else if(isProg) { stats.prog++; }
+            else if(isProc) { stats.proc++; }
+            else { stats.pend++; }
             
             stats.cCounts[d.clase] = (stats.cCounts[d.clase]||0)+1;
             
@@ -756,8 +765,10 @@ def generar_html_moderno(db_json):
             }
 
             const e = d.ejecutor || 'Sin Asignar';
-            if(!stats.ex[e]) stats.ex[e]={ok:0, pend:0};
-            if(isOk) stats.ex[e].ok++; else stats.ex[e].pend++;
+            if(!stats.ex[e]) stats.ex[e]={ok:0, proc:0, pend:0};
+            if(isOk) stats.ex[e].ok++;
+            else if(isProc) stats.ex[e].proc++;
+            else stats.ex[e].pend++; 
 
             const l = d.ubicacion || 'Sin Ubicación';
             if(!stats.loc[l]) stats.loc[l]=0;
@@ -784,6 +795,8 @@ def generar_html_moderno(db_json):
             if (area) {
                 statsArea[area].total++;
                 if (isOk) statsArea[area].ok++;
+                else if (isProc) statsArea[area].proc++;
+                else statsArea[area].pend++;
             }
         });
 
@@ -834,10 +847,17 @@ def generar_html_moderno(db_json):
         };
         const gridHideY = { x: { grid: { color: '#f1f5f9' } }, y: { grid: { display: false } } };
 
-        // GRÁFICO 1: Status Backlog (Doughnut)
+        // GRÁFICO 1: Status Backlog (Doughnut) ACTUALIZADO
         new Chart(getFreshCanvas('chart1'), { 
             type: 'doughnut', 
-            data: { labels:['Cerradas','Pendientes','Programadas'], datasets:[{ data:[stats.ok, stats.pend, stats.prog], backgroundColor:['#10b981','#ef4444','#3b82f6'], borderWidth: 2, borderColor: '#fff', hoverOffset: 5 }] }, 
+            data: { 
+                labels:['Cerradas', 'En Proceso', 'Pendientes', 'Programadas'], 
+                datasets:[{ 
+                    data:[stats.ok, stats.proc, stats.pend, stats.prog], 
+                    backgroundColor:['#10b981', '#f59e0b', '#ef4444', '#3b82f6'], 
+                    borderWidth: 2, borderColor: '#fff', hoverOffset: 5 
+                }] 
+            }, 
             options: { 
                 ...chartOpts, 
                 cutout: '65%', 
@@ -848,7 +868,7 @@ def generar_html_moderno(db_json):
                             let val = ctx.dataset.data[ctx.dataIndex]; 
                             if(val === 0) return false; 
                             let sum = ctx.chart.data.datasets[0].data.reduce((a, b) => a + b, 0); 
-                            return (val * 100 / sum) > 4; // Solo muestra si es mayor al 4% para que no se superpongan
+                            return (val * 100 / sum) > 4;
                         }, 
                         color: '#fff', 
                         font: { weight: 'bold', size: 14 }, 
@@ -858,7 +878,15 @@ def generar_html_moderno(db_json):
                         } 
                     } 
                 }, 
-                onClick: (e, els, ch) => { if(els.length>0) showDataModal(ch.data.labels[els[0].index], d => { let st = ch.data.labels[els[0].index]; if(st==='Cerradas') return d.status==='realizada'; if(st==='Programadas') return d.status==='programado'; return d.status==='pendiente' || d.status==='en proceso'; }); } 
+                onClick: (e, els, ch) => { 
+                    if(els.length>0) showDataModal(ch.data.labels[els[0].index], d => { 
+                        let st = ch.data.labels[els[0].index]; 
+                        if(st==='Cerradas') return d.status==='realizada'; 
+                        if(st==='En Proceso') return d.status==='en proceso'; 
+                        if(st==='Programadas') return d.status==='programado'; 
+                        return d.status==='pendiente'; 
+                    }); 
+                } 
             }
         });
         
@@ -875,7 +903,7 @@ def generar_html_moderno(db_json):
                             let val = ctx.dataset.data[ctx.dataIndex]; 
                             if(val === 0) return false; 
                             let sum = ctx.chart.data.datasets[0].data.reduce((a, b) => a + b, 0); 
-                            return (val * 100 / sum) > 4; // Ocultar % pequeñitos
+                            return (val * 100 / sum) > 4;
                         }, 
                         color: '#fff', 
                         font: { weight: 'bold', size: 14 }, 
@@ -889,11 +917,18 @@ def generar_html_moderno(db_json):
             }
         });
         
-        // GRÁFICO 3: Carga por Responsable (Bar)
-        const sortedEx = Object.entries(stats.ex).sort((a,b)=>(b[1].ok+b[1].pend)-(a[1].ok+a[1].pend)).slice(0,12);
+        // GRÁFICO 3: Carga por Responsable (Bar) ACTUALIZADO
+        const sortedEx = Object.entries(stats.ex).sort((a,b)=>(b[1].ok+b[1].pend+b[1].proc)-(a[1].ok+a[1].pend+a[1].proc)).slice(0,12);
         new Chart(getFreshCanvas('chart3'), { 
             type: 'bar', 
-            data: { labels: sortedEx.map(x=>x[0]), datasets: [ { label:'Pendientes', data:sortedEx.map(x=>x[1].pend), backgroundColor:'#ef4444', borderRadius: 4, barPercentage: 0.7 }, { label:'Cerradas', data:sortedEx.map(x=>x[1].ok), backgroundColor:'#10b981', borderRadius: 4, barPercentage: 0.7 } ]}, 
+            data: { 
+                labels: sortedEx.map(x=>x[0]), 
+                datasets: [ 
+                    { label:'Pendientes', data:sortedEx.map(x=>x[1].pend), backgroundColor:'#ef4444', borderRadius: 4, barPercentage: 0.7 }, 
+                    { label:'En Proceso', data:sortedEx.map(x=>x[1].proc), backgroundColor:'#f59e0b', borderRadius: 4, barPercentage: 0.7 }, 
+                    { label:'Cerradas', data:sortedEx.map(x=>x[1].ok), backgroundColor:'#10b981', borderRadius: 4, barPercentage: 0.7 } 
+                ]
+            }, 
             options: { 
                 ...chartOpts, 
                 indexAxis: 'y', 
@@ -906,7 +941,7 @@ def generar_html_moderno(db_json):
                             if(val === 0) return false;
                             let sum = 0; 
                             ctx.chart.data.datasets.forEach(ds => { sum += ds.data[ctx.dataIndex]; });
-                            return (val * 100 / sum) > 5; // Solo mostrar si la barra representa más del 5%
+                            return (val * 100 / sum) > 5;
                         }, 
                         color: '#fff', 
                         font: { weight: 'bold', size: 12 }, 
@@ -914,40 +949,84 @@ def generar_html_moderno(db_json):
                             let sum = 0; 
                             ctx.chart.data.datasets.forEach(ds => { sum += ds.data[ctx.dataIndex]; }); 
                             let perc = (value * 100 / sum).toFixed(0) + '%'; 
-                            return value + ' (' + perc + ')'; // Muestra "15 (60%)"
+                            return value + ' (' + perc + ')';
                         } 
                     } 
                 }, 
-                onClick: (e, els, ch) => { if(els.length>0) showDataModal(ch.data.labels[els[0].index], d => d.ejecutor === ch.data.labels[els[0].index]); } 
+                onClick: (e, els, ch) => { 
+                    if(els.length>0) {
+                        let label = ch.data.labels[els[0].index];
+                        let datasetIndex = els[0].datasetIndex;
+                        let targetStatus = datasetIndex === 2 ? 'realizada' : (datasetIndex === 1 ? 'en proceso' : 'pendiente');
+                        
+                        showDataModal(label, d => {
+                            let isMatch = d.ejecutor === label;
+                            if(targetStatus === 'realizada') return isMatch && d.status === 'realizada';
+                            if(targetStatus === 'en proceso') return isMatch && d.status === 'en proceso';
+                            // Si hace clic en pendientes, mostramos lo pendiente y lo programado
+                            return isMatch && d.status !== 'realizada' && d.status !== 'en proceso';
+                        }); 
+                    }
+                } 
             }
         });
 
-        // NUEVO GRÁFICO 5: Avance por Área
+        // NUEVO GRÁFICO 5: Avance por Área ACTUALIZADO
         const areaLabels = ['Mecánico', 'Autómata', 'Frio', 'Infraestructura'];
-        const areaData = areaLabels.map(l => statsArea[l].total > 0 ? Math.round((statsArea[l].ok / statsArea[l].total) * 100) : 0);
+        
+        const areaPendData = areaLabels.map(l => statsArea[l].pend);
+        const areaProcData = areaLabels.map(l => statsArea[l].proc);
+        const areaOkData = areaLabels.map(l => statsArea[l].ok);
 
         new Chart(getFreshCanvas('chart5'), {
             type: 'bar',
             data: { 
                 labels: areaLabels, 
-                datasets: [ { label: '% de Avance', data: areaData, backgroundColor: '#3b82f6', borderRadius: 6, barPercentage: 0.6 } ] 
+                datasets: [ 
+                    { label: 'Pendientes', data: areaPendData, backgroundColor: '#ef4444', borderRadius: 4, barPercentage: 0.7 },
+                    { label: 'En Proceso', data: areaProcData, backgroundColor: '#f59e0b', borderRadius: 4, barPercentage: 0.7 },
+                    { label: 'Cerradas', data: areaOkData, backgroundColor: '#10b981', borderRadius: 4, barPercentage: 0.7 }
+                ] 
             },
             options: { 
                 ...chartOpts, 
                 indexAxis: 'y', 
-                scales: { x: { max: 100, grid: {color:'#f1f5f9'} }, y: { grid: {display:false} } }, 
+                scales: { x: { stacked: true, grid: { color: '#f1f5f9' } }, y: { stacked: true, grid: { display: false } } }, 
                 plugins: { 
-                    legend: { display: false }, 
+                    legend: { position: 'top', labels: { usePointStyle: true } }, 
                     datalabels: { 
-                        display: (ctx) => ctx.dataset.data[ctx.dataIndex] > 0, 
-                        color: '#fff', font: { weight: 'bold', size: 13 },
-                        formatter: (val) => val + '%'
-                    }
+                        display: (ctx) => {
+                            let val = ctx.dataset.data[ctx.dataIndex];
+                            if(val === 0) return false;
+                            let sum = 0; 
+                            ctx.chart.data.datasets.forEach(ds => { sum += ds.data[ctx.dataIndex]; });
+                            return (val * 100 / sum) > 5; 
+                        }, 
+                        color: '#fff', 
+                        font: { weight: 'bold', size: 12 }, 
+                        formatter: (value, ctx) => { 
+                            let sum = 0; 
+                            ctx.chart.data.datasets.forEach(ds => { sum += ds.data[ctx.dataIndex]; }); 
+                            let perc = sum > 0 ? (value * 100 / sum).toFixed(0) + '%' : '0%'; 
+                            return value + ' (' + perc + ')'; 
+                        } 
+                    } 
                 }, 
                 onClick: (e, els, ch) => { 
-                    if(els.length>0) {
+                    if(els.length > 0) {
                         let label = ch.data.labels[els[0].index];
-                        showDataModal('Avance ' + label, d => {
+                        let datasetIndex = els[0].datasetIndex;
+                        let targetStatus = datasetIndex === 2 ? 'realizada' : (datasetIndex === 1 ? 'en proceso' : 'pendiente');
+                        let titleStatus = datasetIndex === 2 ? 'Cerradas' : (datasetIndex === 1 ? 'En Proceso' : 'Pendientes');
+
+                        showDataModal('Avance ' + label + ' - ' + titleStatus, d => {
+                            let isStMatch = false;
+                            if (targetStatus === 'realizada') isStMatch = (d.status === 'realizada');
+                            else if (targetStatus === 'en proceso') isStMatch = (d.status === 'en proceso');
+                            else isStMatch = (d.status !== 'realizada' && d.status !== 'en proceso');
+                            
+                            if (!isStMatch) return false;
+
                             let ejL = (d.ejecutor || '').toLowerCase();
                             if (label === 'Mecánico') return ejL.includes('luis lagos') || ejL.includes('luis guajardo') || ejL.includes('rubén carrasco') || ejL.includes('ruben carrasco') || ejL.includes('marcelo rivera');
                             if (label === 'Autómata') return ejL.includes('autómata') || ejL.includes('automata');
@@ -971,7 +1050,7 @@ def generar_html_moderno(db_json):
                 scales: gridHideY, 
                 plugins: { 
                     legend: { display: false }, 
-                    datalabels: {display:false} // Mantengo apagados estos números para no saturar este en específico
+                    datalabels: {display:false} 
                 }, 
                 onClick: (e, els, ch) => { if(els.length>0) showDataModal(ch.data.labels[els[0].index], d => d.ubicacion === ch.data.labels[els[0].index], 'clase'); } 
             }
