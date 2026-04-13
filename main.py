@@ -1122,8 +1122,8 @@ def generar_html_moderno(db_json):
         
         chartInstances['row_chart1'] = new Chart(getFreshCanvas('row_chart1'), {
             type: 'pie',
-            // COLOR AMARILLO APLICADO A LA CATEGORIA ASEO AQUI
-            data: { labels: ['Mantenimiento', 'Aseo'], datasets: [{ data: [pMttoTot, pAseoTot], backgroundColor: ['#8b5cf6', '#eab308'], borderWidth: 2, borderColor: '#fff' }] },
+            // COLOR CAMBIADO A AZUL (#3b82f6) PARA MANTENIMIENTO
+            data: { labels: ['Mantenimiento', 'Aseo'], datasets: [{ data: [pMttoTot, pAseoTot], backgroundColor: ['#3b82f6', '#eab308'], borderWidth: 2, borderColor: '#fff' }] },
             options: { 
                 ...commonOptsRow, 
                 plugins: { ...commonOptsRow.plugins, legend: { position: 'bottom', labels: { usePointStyle: true } } },
@@ -1139,7 +1139,8 @@ def generar_html_moderno(db_json):
         let pMttoCump = getPerc(stats.mtto.ok, stats.mtto.total);
         chartInstances['row_chart2'] = new Chart(getFreshCanvas('row_chart2'), {
             type: 'bar',
-            data: { labels: ['Cumplimiento MTTO'], datasets: [{ label: 'Cerradas', data: [pMttoCump], backgroundColor: '#8b5cf6', barPercentage: 0.5, borderRadius: 6 }] },
+            // COLOR CAMBIADO A AZUL (#3b82f6)
+            data: { labels: ['Cumplimiento MTTO'], datasets: [{ label: 'Cerradas', data: [pMttoCump], backgroundColor: '#3b82f6', barPercentage: 0.5, borderRadius: 6 }] },
             options: { 
                 ...commonOptsRow, indexAxis: 'y', scales: { x: { max: 100, grid: {color:'#f1f5f9'} }, y: { grid: {display:false} } }, 
                 plugins: { ...commonOptsRow.plugins, legend: { display: false } },
@@ -1150,7 +1151,6 @@ def generar_html_moderno(db_json):
         let pAseoCump = getPerc(stats.aseo.ok, stats.aseo.total);
         chartInstances['row_chart3'] = new Chart(getFreshCanvas('row_chart3'), {
             type: 'bar',
-            // COLOR AMARILLO APLICADO AL CUMPLIMIENTO ASEO AQUI
             data: { labels: ['Cumplimiento Aseo/Limpieza'], datasets: [{ label: 'Cerradas', data: [pAseoCump], backgroundColor: '#eab308', barPercentage: 0.5, borderRadius: 6 }] },
             options: { 
                 ...commonOptsRow, indexAxis: 'y', scales: { x: { max: 100, grid: {color:'#f1f5f9'} }, y: { grid: {display:false} } }, 
@@ -1166,7 +1166,8 @@ def generar_html_moderno(db_json):
             type: 'bar',
             data: { 
                 labels: pLabels, 
-                datasets: [ { label: '% Cumpl. Mtto', data: pMttoData, backgroundColor: '#8b5cf6', borderRadius: 4, barPercentage: 0.8, categoryPercentage: 0.8 } ] 
+                // COLOR CAMBIADO A AZUL (#3b82f6)
+                datasets: [ { label: '% Cumpl. Mtto', data: pMttoData, backgroundColor: '#3b82f6', borderRadius: 4, barPercentage: 0.8, categoryPercentage: 0.8 } ] 
             },
             options: { 
                 ...commonOptsRow, indexAxis: 'y', scales: { x: { max: 100, grid: {color:'#f1f5f9'} }, y: { grid: {display:false} } }, 
@@ -1187,7 +1188,8 @@ def generar_html_moderno(db_json):
             type: 'bar',
             data: { 
                 labels: dLabels, 
-                datasets: [ { label: '% Cumpl. Mtto', data: dMttoData, backgroundColor: '#8b5cf6', borderRadius: 4, barPercentage: 0.8, categoryPercentage: 0.8 } ] 
+                // COLOR CAMBIADO A AZUL (#3b82f6)
+                datasets: [ { label: '% Cumpl. Mtto', data: dMttoData, backgroundColor: '#3b82f6', borderRadius: 4, barPercentage: 0.8, categoryPercentage: 0.8 } ] 
             },
             options: { 
                 ...commonOptsRow, indexAxis: 'y', scales: { x: { max: 100, grid: {color:'#f1f5f9'} }, y: { grid: {display:false} } }, 
