@@ -340,11 +340,11 @@ def generar_html_moderno(db_json):
                 <div id="summary_content" style="display:flex; flex-direction:column; justify-content:space-around; flex:1;"></div>
             </div>
             
-            <div class="chart-card wide"><div class="chart-title">Carga Laboral por Responsable</div><div class="canvas-container"><canvas id="chart3"></canvas></div></div>
-            
             <div class="chart-card wide"><div class="chart-title">Avance por Área</div><div class="canvas-container"><canvas id="chart5"></canvas></div></div>
             
             <div class="chart-card wide"><div class="chart-title">Top Ubicaciones Críticas</div><div class="canvas-container"><canvas id="chart4"></canvas></div></div>
+
+            <div class="chart-card wide"><div class="chart-title">Carga Laboral por Responsable</div><div class="canvas-container"><canvas id="chart3"></canvas></div></div>
         </div>
         
         <div id="view_row" style="display:none; flex:1; flex-direction:column; overflow-y:auto; padding:30px; background:#f1f5f9;">
