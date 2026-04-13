@@ -138,7 +138,6 @@ def main():
 # 4. GENERADOR HTML
 # ==========================================
 def generar_html_moderno(db_json):
-    # AQUÍ ESTÁ EL CAMBIO DE LA OPCIÓN A:
     fecha_actual = datetime.now(ZoneInfo("America/Santiago")).strftime("%d/%m/%Y %H:%M")
     
     html_template = """<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Dashboard Mantenimiento</title>
@@ -344,6 +343,8 @@ def generar_html_moderno(db_json):
             </div>
             
             <div class="chart-card wide"><div class="chart-title">Carga Laboral por Responsable</div><div class="canvas-container"><canvas id="chart3"></canvas></div></div>
+            <div class="chart-card wide"><div class="chart-title">Avance por Área</div><div class="canvas-container"><canvas id="chart5"></canvas></div></div>
+            
             <div class="chart-card wide"><div class="chart-title">Top Ubicaciones Críticas</div><div class="canvas-container"><canvas id="chart4"></canvas></div></div>
         </div>
         
@@ -725,6 +726,14 @@ def generar_html_moderno(db_json):
         let totAseo = 0, okAseo = 0;
         let totMtto = 0, okMtto = 0;
         let totGen = data.length, okGen = 0;
+        
+        // Objeto para el nuevo Gráfico de Avance por Área
+        let statsArea = {
+            'Mecánico': { total: 0, ok: 0 },
+            'Autómata': { total: 0, ok: 0 },
+            'Frio': { total: 0, ok: 0 },
+            'Infraestructura': { total: 0, ok: 0 }
+        };
 
         weeks.forEach(w => stats.wCounts[w] = {total:0, ok:0});
         
@@ -756,6 +765,24 @@ def generar_html_moderno(db_json):
             if(d.semana!=="S/N" && stats.wCounts[d.semana]) {
                 stats.wCounts[d.semana].total++;
                 if(isOk) stats.wCounts[d.semana].ok++;
+            }
+            
+            // Lógica de agrupación para Avance por Área
+            let ejLower = (d.ejecutor || '').toLowerCase();
+            let area = null;
+            if (ejLower.includes('luis lagos') || ejLower.includes('luis guajardo') || ejLower.includes('rubén carrasco') || ejLower.includes('ruben carrasco') || ejLower.includes('marcelo rivera')) {
+                area = 'Mecánico';
+            } else if (ejLower.includes('autómata') || ejLower.includes('automata')) {
+                area = 'Autómata';
+            } else if (ejLower.includes('edward corona') || ejLower.includes('frio') || ejLower.includes('frío')) {
+                area = 'Frio';
+            } else if (ejLower.includes('infraestructura')) {
+                area = 'Infraestructura';
+            }
+            
+            if (area) {
+                statsArea[area].total++;
+                if (isOk) statsArea[area].ok++;
             }
         });
 
@@ -894,11 +921,49 @@ def generar_html_moderno(db_json):
             }
         });
 
+        // NUEVO GRÁFICO 5: Avance por Área
+        const areaLabels = ['Mecánico', 'Autómata', 'Frio', 'Infraestructura'];
+        const areaData = areaLabels.map(l => statsArea[l].total > 0 ? Math.round((statsArea[l].ok / statsArea[l].total) * 100) : 0);
+
+        new Chart(getFreshCanvas('chart5'), {
+            type: 'bar',
+            data: { 
+                labels: areaLabels, 
+                datasets: [ { label: '% de Avance', data: areaData, backgroundColor: '#3b82f6', borderRadius: 6, barPercentage: 0.6 } ] 
+            },
+            options: { 
+                ...chartOpts, 
+                indexAxis: 'y', 
+                scales: { x: { max: 100, grid: {color:'#f1f5f9'} }, y: { grid: {display:false} } }, 
+                plugins: { 
+                    legend: { display: false }, 
+                    datalabels: { 
+                        display: (ctx) => ctx.dataset.data[ctx.dataIndex] > 0, 
+                        color: '#fff', font: { weight: 'bold', size: 13 },
+                        formatter: (val) => val + '%'
+                    }
+                }, 
+                onClick: (e, els, ch) => { 
+                    if(els.length>0) {
+                        let label = ch.data.labels[els[0].index];
+                        showDataModal('Avance ' + label, d => {
+                            let ejL = (d.ejecutor || '').toLowerCase();
+                            if (label === 'Mecánico') return ejL.includes('luis lagos') || ejL.includes('luis guajardo') || ejL.includes('rubén carrasco') || ejL.includes('ruben carrasco') || ejL.includes('marcelo rivera');
+                            if (label === 'Autómata') return ejL.includes('autómata') || ejL.includes('automata');
+                            if (label === 'Frio') return ejL.includes('edward corona') || ejL.includes('frio') || ejL.includes('frío');
+                            if (label === 'Infraestructura') return ejL.includes('infraestructura');
+                            return false;
+                        });
+                    }
+                } 
+            }
+        });
+
         // GRÁFICO 4: Top Ubicaciones Críticas (Barra simple)
         const sortedLocs = Object.entries(stats.loc).sort((a,b)=>b[1]-a[1]).slice(0,12);
         new Chart(getFreshCanvas('chart4'), {
             type: 'bar',
-            data: { labels: sortedLocs.map(x=>x[0]), datasets: [ { label: 'Total Hallazgos', data: sortedLocs.map(x=>x[1]), backgroundColor:'#3b82f6', borderRadius: 6, barPercentage: 0.6 } ]},
+            data: { labels: sortedLocs.map(x=>x[0]), datasets: [ { label: 'Total Hallazgos', data: sortedLocs.map(x=>x[1]), backgroundColor:'#8b5cf6', borderRadius: 6, barPercentage: 0.6 } ]},
             options: { 
                 ...chartOpts, 
                 indexAxis: 'y', 
