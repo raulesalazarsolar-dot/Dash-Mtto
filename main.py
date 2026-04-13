@@ -63,7 +63,7 @@ def main():
             "prioridad": "Prioridad", 
             "ejecutor": "Responsable", 
             "ubicacion": "Ubicación",      
-            "sub_ubi": "Sub Ubicación",    
+            "sub_ubi": "Sub Ubicación",   
             "ot": "OT", 
             "zona": "Zona", 
             "f_lev": "Levantamiento",
@@ -809,7 +809,7 @@ def generar_html_moderno(db_json):
         let summaryHtml = `
             <div class="summary-block">
                 <div class="summary-header">
-                    <span class="summary-title" style="color:#3b82f6;">🧹 Aseo / Limpieza</span>
+                    <span class="summary-title" style="color:#eab308;">🧹 Aseo / Limpieza</span>
                     <span class="summary-perc" style="color:${colAseo};">${percAseo}%</span>
                 </div>
                 <div class="summary-sub">De un total de <b>${totAseo}</b>, <b>${okAseo}</b> realizadas</div>
@@ -888,10 +888,17 @@ def generar_html_moderno(db_json):
             }
         });
         
-        // GRÁFICO 2: Clase de Mtto (Pie)
+        // GRÁFICO 2: Clase de Mtto (Pie) - COLOR DINAMICO PARA ASEO/LIMPIEZA A AMARILLO
+        let cLabels = Object.keys(stats.cCounts);
+        let baseColors = ['#3b82f6','#8b5cf6','#ec4899','#14b8a6','#f97316', '#6366f1', '#10b981'];
+        let cBgColors = cLabels.map((lbl, idx) => {
+            if(lbl.toLowerCase().includes('aseo') || lbl.toLowerCase().includes('limpieza')) return '#eab308'; // Amarillo Aseo
+            return baseColors[idx % baseColors.length];
+        });
+
         new Chart(getFreshCanvas('chart2'), { 
             type: 'pie', 
-            data: { labels:Object.keys(stats.cCounts), datasets:[{ data:Object.values(stats.cCounts), backgroundColor:['#3b82f6','#8b5cf6','#ec4899','#14b8a6','#f97316'], borderWidth: 2, borderColor: '#fff', hoverOffset: 5 }] }, 
+            data: { labels: cLabels, datasets:[{ data:Object.values(stats.cCounts), backgroundColor: cBgColors, borderWidth: 2, borderColor: '#fff', hoverOffset: 5 }] }, 
             options: { 
                 ...chartOpts, 
                 plugins: { 
@@ -1115,7 +1122,8 @@ def generar_html_moderno(db_json):
         
         chartInstances['row_chart1'] = new Chart(getFreshCanvas('row_chart1'), {
             type: 'pie',
-            data: { labels: ['Mantenimiento', 'Aseo'], datasets: [{ data: [pMttoTot, pAseoTot], backgroundColor: ['#8b5cf6', '#3b82f6'], borderWidth: 2, borderColor: '#fff' }] },
+            // COLOR AMARILLO APLICADO A LA CATEGORIA ASEO AQUI
+            data: { labels: ['Mantenimiento', 'Aseo'], datasets: [{ data: [pMttoTot, pAseoTot], backgroundColor: ['#8b5cf6', '#eab308'], borderWidth: 2, borderColor: '#fff' }] },
             options: { 
                 ...commonOptsRow, 
                 plugins: { ...commonOptsRow.plugins, legend: { position: 'bottom', labels: { usePointStyle: true } } },
@@ -1142,7 +1150,8 @@ def generar_html_moderno(db_json):
         let pAseoCump = getPerc(stats.aseo.ok, stats.aseo.total);
         chartInstances['row_chart3'] = new Chart(getFreshCanvas('row_chart3'), {
             type: 'bar',
-            data: { labels: ['Cumplimiento Aseo/Limpieza'], datasets: [{ label: 'Cerradas', data: [pAseoCump], backgroundColor: '#3b82f6', barPercentage: 0.5, borderRadius: 6 }] },
+            // COLOR AMARILLO APLICADO AL CUMPLIMIENTO ASEO AQUI
+            data: { labels: ['Cumplimiento Aseo/Limpieza'], datasets: [{ label: 'Cerradas', data: [pAseoCump], backgroundColor: '#eab308', barPercentage: 0.5, borderRadius: 6 }] },
             options: { 
                 ...commonOptsRow, indexAxis: 'y', scales: { x: { max: 100, grid: {color:'#f1f5f9'} }, y: { grid: {display:false} } }, 
                 plugins: { ...commonOptsRow.plugins, legend: { display: false } },
