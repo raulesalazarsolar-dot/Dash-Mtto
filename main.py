@@ -402,7 +402,6 @@ def generar_html_moderno(db_json):
         html += createSelect('f_exec', '👷 Responsable', [...new Set(records.map(x=>x.ejecutor))].sort());
         html += createSelect('f_ubi', '🏭 Línea / Área', [...new Set(records.map(x=>x.ubicacion))].sort());
         
-        // FILTRO DE STATUS ACTUALIZADO CON "EN PROCESO"
         html += `<div class="f-group"><label>🚦 Estado</label><select id="f_status" onchange="applyFilters()">
             <option value="ALL">Todas las OTs</option>
             <option value="abiertas">Backlog (No Cerradas)</option>
@@ -779,7 +778,6 @@ def generar_html_moderno(db_json):
                 if(isOk) stats.wCounts[d.semana].ok++;
             }
             
-            // Lógica de agrupación para Avance por Área
             let ejLower = (d.ejecutor || '').toLowerCase();
             let area = null;
             if (ejLower.includes('luis lagos') || ejLower.includes('luis guajardo') || ejLower.includes('rubén carrasco') || ejLower.includes('ruben carrasco') || ejLower.includes('marcelo rivera')) {
@@ -847,7 +845,7 @@ def generar_html_moderno(db_json):
         };
         const gridHideY = { x: { grid: { color: '#f1f5f9' } }, y: { grid: { display: false } } };
 
-        // GRÁFICO 1: Status Backlog (Doughnut) ACTUALIZADO
+        // GRÁFICO 1: Status Backlog (Doughnut)
         new Chart(getFreshCanvas('chart1'), { 
             type: 'doughnut', 
             data: { 
@@ -917,7 +915,7 @@ def generar_html_moderno(db_json):
             }
         });
         
-        // GRÁFICO 3: Carga por Responsable (Bar) ACTUALIZADO
+        // GRÁFICO 3: Carga por Responsable (Bar) 
         const sortedEx = Object.entries(stats.ex).sort((a,b)=>(b[1].ok+b[1].pend+b[1].proc)-(a[1].ok+a[1].pend+a[1].proc)).slice(0,12);
         new Chart(getFreshCanvas('chart3'), { 
             type: 'bar', 
@@ -932,7 +930,10 @@ def generar_html_moderno(db_json):
             options: { 
                 ...chartOpts, 
                 indexAxis: 'y', 
-                scales: { x: { stacked: true, grid: { color: '#f1f5f9' } }, y: { stacked: true, grid: { display: false } } }, 
+                scales: { 
+                    x: { stacked: true, grid: { color: '#f1f5f9' }, ticks: { stepSize: 5 } }, 
+                    y: { stacked: true, grid: { display: false } } 
+                }, 
                 plugins: { 
                     legend: { position: 'top', labels: { usePointStyle: true } }, 
                     datalabels: { 
@@ -948,8 +949,7 @@ def generar_html_moderno(db_json):
                         formatter: (value, ctx) => { 
                             let sum = 0; 
                             ctx.chart.data.datasets.forEach(ds => { sum += ds.data[ctx.dataIndex]; }); 
-                            let perc = (value * 100 / sum).toFixed(0) + '%'; 
-                            return value + ' (' + perc + ')';
+                            return sum > 0 ? (value * 100 / sum).toFixed(0) + '%' : '0%'; 
                         } 
                     } 
                 }, 
@@ -963,7 +963,6 @@ def generar_html_moderno(db_json):
                             let isMatch = d.ejecutor === label;
                             if(targetStatus === 'realizada') return isMatch && d.status === 'realizada';
                             if(targetStatus === 'en proceso') return isMatch && d.status === 'en proceso';
-                            // Si hace clic en pendientes, mostramos lo pendiente y lo programado
                             return isMatch && d.status !== 'realizada' && d.status !== 'en proceso';
                         }); 
                     }
@@ -971,7 +970,7 @@ def generar_html_moderno(db_json):
             }
         });
 
-        // NUEVO GRÁFICO 5: Avance por Área ACTUALIZADO
+        // NUEVO GRÁFICO 5: Avance por Área 
         const areaLabels = ['Mecánico', 'Autómata', 'Frio', 'Infraestructura'];
         
         const areaPendData = areaLabels.map(l => statsArea[l].pend);
@@ -991,7 +990,10 @@ def generar_html_moderno(db_json):
             options: { 
                 ...chartOpts, 
                 indexAxis: 'y', 
-                scales: { x: { stacked: true, grid: { color: '#f1f5f9' } }, y: { stacked: true, grid: { display: false } } }, 
+                scales: { 
+                    x: { stacked: true, grid: { color: '#f1f5f9' }, ticks: { stepSize: 5 } }, 
+                    y: { stacked: true, grid: { display: false } } 
+                }, 
                 plugins: { 
                     legend: { position: 'top', labels: { usePointStyle: true } }, 
                     datalabels: { 
@@ -1007,8 +1009,7 @@ def generar_html_moderno(db_json):
                         formatter: (value, ctx) => { 
                             let sum = 0; 
                             ctx.chart.data.datasets.forEach(ds => { sum += ds.data[ctx.dataIndex]; }); 
-                            let perc = sum > 0 ? (value * 100 / sum).toFixed(0) + '%' : '0%'; 
-                            return value + ' (' + perc + ')'; 
+                            return sum > 0 ? (value * 100 / sum).toFixed(0) + '%' : '0%'; 
                         } 
                     } 
                 }, 
