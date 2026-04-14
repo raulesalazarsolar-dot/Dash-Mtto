@@ -700,10 +700,10 @@ def generar_html_moderno(db_json):
         XLSX.writeFile(workbook, `Reporte_MTTO_${fechaEx}.xlsx`);
     }
 
+    // AQUI ESTA LA FUNCION CORREGIDA
     const isAseoAct = (d) => {
-        let textMatch = (d.ubicacion + " " + (d.sub_ubi || "") + " " + (d.titulo || "")).toLowerCase();
         let claseL = (d.clase || '').toLowerCase();
-        return textMatch.includes('aseo') || textMatch.includes('limpieza') || claseL.includes('aseo') || claseL.includes('limpieza');
+        return claseL.includes('aseo') || claseL.includes('limpieza');
     };
 
     const getPLoc = (d) => {
