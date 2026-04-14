@@ -147,7 +147,8 @@ def generar_html_moderno(db_json):
     <style>
         :root { --primary: #0f172a; --secondary: #334155; --accent: #2563eb; --bg: #f8fafc; --border: #e2e8f0; --text: #1e293b; --muted: #64748b; --success: #10b981; --warn: #f59e0b; --danger: #ef4444; --info: #3b82f6; }
         * { box-sizing: border-box; outline: none; font-family: 'Segoe UI', system-ui, sans-serif; }
-        body { background: var(--bg); color: var(--text); margin: 0; height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
+        /* Fondo cambiado a transparente para mostrar el canvas debajo */
+        body { background: transparent; color: var(--text); margin: 0; height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
         
         .top-bar { background: var(--primary); color: white; padding: 0 20px; height: 60px; display: flex; justify-content: space-between; align-items: center; flex-shrink: 0; z-index: 10; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
         .brand h2 { margin: 0; font-size: 1.2rem; display:flex; align-items:center; gap: 8px; } 
@@ -195,7 +196,7 @@ def generar_html_moderno(db_json):
         .tag { padding: 4px 8px; border-radius: 4px; font-weight: 700; font-size: 0.7rem; letter-spacing: 0.3px; }
         .st-ok { background: #dcfce7; color: #166534; } .st-pend { background: #fee2e2; color: #991b1b; } .st-prog { background: #e0f2fe; color: #075985; } .st-proc { background: #fef3c7; color: #92400e; }
         
-        .col-detail { flex: 1; background: #f1f5f9; overflow-y: auto; padding: 40px; }
+        .col-detail { flex: 1; overflow-y: auto; padding: 40px; }
         .empty-state { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; color: var(--muted); opacity: 0.7; }
         .detail-content { background: white; border-radius: 12px; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1); overflow: hidden; max-width: 1000px; margin: 0 auto; border: 1px solid var(--border); }
         .detail-header { padding: 30px; border-bottom: 1px solid var(--border); background: #fff; }
@@ -218,7 +219,7 @@ def generar_html_moderno(db_json):
         .gal-img { max-width: 100%; max-height: 350px; border-radius: 6px; cursor: zoom-in; box-shadow: 0 2px 5px rgba(0,0,0,0.1); transition: transform 0.2s; object-fit: contain; }
         .gal-img:hover { transform: scale(1.02); }
         
-        .graficos-layout { flex: 1; padding: 30px; display: grid; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); grid-auto-rows: min-content; gap: 25px; overflow-y: auto; background: #f1f5f9; align-content: start; }
+        .graficos-layout { flex: 1; padding: 30px; display: grid; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); grid-auto-rows: min-content; gap: 25px; overflow-y: auto; align-content: start; }
         .chart-card { background: white; padding: 25px; border-radius: 12px; border: 1px solid var(--border); box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); display: flex; flex-direction: column; height: 400px; width: 100%; }
         .chart-card.wide { grid-column: 1 / -1; height: 450px; }
         .chart-title { font-size: 1rem; font-weight: 700; color: var(--secondary); margin-bottom: 15px; text-transform: uppercase; text-align: center; }
@@ -347,7 +348,7 @@ def generar_html_moderno(db_json):
             <div class="chart-card wide"><div class="chart-title">Carga Laboral por Responsable</div><div class="canvas-container"><canvas id="chart3"></canvas></div></div>            
         </div>
         
-        <div id="view_row" style="display:none; flex:1; flex-direction:column; overflow-y:auto; padding:30px; background:#f1f5f9;">
+        <div id="view_row" style="display:none; flex:1; flex-direction:column; overflow-y:auto; padding:30px;">
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px; flex-wrap:wrap; gap:15px;">
                 <h2 style="color:var(--primary); margin:0; font-size:1.8rem;">Planificación Mantenimiento <span id="row_week_title" style="color:var(--accent);">--</span></h2>
                 <button id="btn_descargar_row" class="btn-clean" style="width:auto; margin:0; padding: 8px 15px; border-color:var(--accent); color:var(--accent); display:flex; align-items:center; gap:8px;" onclick="descargarROW()">
@@ -845,7 +846,6 @@ def generar_html_moderno(db_json):
         };
         const gridHideY = { x: { grid: { color: '#f1f5f9' } }, y: { grid: { display: false } } };
 
-        // GRÁFICO 1: Status Backlog (Doughnut)
         new Chart(getFreshCanvas('chart1'), { 
             type: 'doughnut', 
             data: { 
@@ -888,11 +888,10 @@ def generar_html_moderno(db_json):
             }
         });
         
-        // GRÁFICO 2: Clase de Mtto (Pie) - COLOR DINAMICO PARA ASEO/LIMPIEZA A AMARILLO
         let cLabels = Object.keys(stats.cCounts);
         let baseColors = ['#3b82f6','#8b5cf6','#ec4899','#14b8a6','#f97316', '#6366f1', '#10b981'];
         let cBgColors = cLabels.map((lbl, idx) => {
-            if(lbl.toLowerCase().includes('aseo') || lbl.toLowerCase().includes('limpieza')) return '#eab308'; // Amarillo Aseo
+            if(lbl.toLowerCase().includes('aseo') || lbl.toLowerCase().includes('limpieza')) return '#eab308';
             return baseColors[idx % baseColors.length];
         });
 
@@ -922,7 +921,6 @@ def generar_html_moderno(db_json):
             }
         });
         
-        // GRÁFICO 3: Carga por Responsable (Bar) 
         const sortedEx = Object.entries(stats.ex).sort((a,b)=>(b[1].ok+b[1].pend+b[1].proc)-(a[1].ok+a[1].pend+a[1].proc)).slice(0,12);
         new Chart(getFreshCanvas('chart3'), { 
             type: 'bar', 
@@ -974,9 +972,7 @@ def generar_html_moderno(db_json):
             }
         });
 
-        // NUEVO GRÁFICO 5: Avance por Área 
         const areaLabels = ['Mecánico', 'Autómata', 'Frio', 'Infraestructura'];
-        
         const areaPendData = areaLabels.map(l => statsArea[l].pend);
         const areaProcData = areaLabels.map(l => statsArea[l].proc);
         const areaOkData = areaLabels.map(l => statsArea[l].ok);
@@ -1041,7 +1037,6 @@ def generar_html_moderno(db_json):
             }
         });
 
-        // GRÁFICO 4: Top Ubicaciones Críticas (Barra simple)
         const sortedLocs = Object.entries(stats.loc).sort((a,b)=>b[1]-a[1]).slice(0,12);
         new Chart(getFreshCanvas('chart4'), {
             type: 'bar',
@@ -1122,7 +1117,6 @@ def generar_html_moderno(db_json):
         
         chartInstances['row_chart1'] = new Chart(getFreshCanvas('row_chart1'), {
             type: 'pie',
-            // COLOR CAMBIADO A AZUL (#3b82f6) PARA MANTENIMIENTO
             data: { labels: ['Mantenimiento', 'Aseo'], datasets: [{ data: [pMttoTot, pAseoTot], backgroundColor: ['#3b82f6', '#eab308'], borderWidth: 2, borderColor: '#fff' }] },
             options: { 
                 ...commonOptsRow, 
@@ -1139,7 +1133,6 @@ def generar_html_moderno(db_json):
         let pMttoCump = getPerc(stats.mtto.ok, stats.mtto.total);
         chartInstances['row_chart2'] = new Chart(getFreshCanvas('row_chart2'), {
             type: 'bar',
-            // COLOR CAMBIADO A AZUL (#3b82f6)
             data: { labels: ['Cumplimiento MTTO'], datasets: [{ label: 'Cerradas', data: [pMttoCump], backgroundColor: '#3b82f6', barPercentage: 0.5, borderRadius: 6 }] },
             options: { 
                 ...commonOptsRow, indexAxis: 'y', scales: { x: { max: 100, grid: {color:'#f1f5f9'} }, y: { grid: {display:false} } }, 
@@ -1166,7 +1159,6 @@ def generar_html_moderno(db_json):
             type: 'bar',
             data: { 
                 labels: pLabels, 
-                // COLOR CAMBIADO A AZUL (#3b82f6)
                 datasets: [ { label: '% Cumpl. Mtto', data: pMttoData, backgroundColor: '#3b82f6', borderRadius: 4, barPercentage: 0.8, categoryPercentage: 0.8 } ] 
             },
             options: { 
@@ -1188,7 +1180,6 @@ def generar_html_moderno(db_json):
             type: 'bar',
             data: { 
                 labels: dLabels, 
-                // COLOR CAMBIADO A AZUL (#3b82f6)
                 datasets: [ { label: '% Cumpl. Mtto', data: dMttoData, backgroundColor: '#3b82f6', borderRadius: 4, barPercentage: 0.8, categoryPercentage: 0.8 } ] 
             },
             options: { 
@@ -1204,9 +1195,117 @@ def generar_html_moderno(db_json):
         });
     }
 
+    // --- NUEVO: EFECTO ANTIGRAVEDAD / PARTÍCULAS ---
+    const initAntigravity = () => {
+        const canvas = document.createElement('canvas');
+        canvas.id = 'antigravity-bg';
+        document.body.prepend(canvas);
+        const ctx = canvas.getContext('2d');
+
+        canvas.style.position = 'fixed';
+        canvas.style.top = '0';
+        canvas.style.left = '0';
+        canvas.style.width = '100vw';
+        canvas.style.height = '100vh';
+        canvas.style.zIndex = '-1'; 
+        canvas.style.pointerEvents = 'none';
+        canvas.style.backgroundColor = '#f8fafc'; // Fondo general de tu aplicación
+
+        let particles = [];
+        // Paleta oficial de Google Antigravity
+        const colors = ['#4285F4', '#EA4335', '#FBBC05', '#34A853', '#A0C3FF', '#FCA297'];
+        let mouse = { x: null, y: null, radius: 120 };
+
+        window.addEventListener('mousemove', (e) => {
+            mouse.x = e.x;
+            mouse.y = e.y;
+        });
+
+        window.addEventListener('mouseout', () => {
+            mouse.x = undefined;
+            mouse.y = undefined;
+        });
+
+        window.addEventListener('resize', () => {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+            initParticles();
+        });
+
+        class Particle {
+            constructor(x, y) {
+                this.x = x;
+                this.y = y;
+                this.baseX = x;
+                this.baseY = y;
+                this.size = Math.random() * 2 + 1.5;
+                this.color = colors[Math.floor(Math.random() * colors.length)];
+                this.density = (Math.random() * 20) + 2;
+            }
+            draw() {
+                ctx.fillStyle = this.color;
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+                ctx.closePath();
+                ctx.fill();
+            }
+            update() {
+                let dx = mouse.x - this.x;
+                let dy = mouse.y - this.y;
+                let distance = Math.sqrt(dx * dx + dy * dy);
+                
+                if (distance < mouse.radius) {
+                    let forceDirectionX = dx / distance;
+                    let forceDirectionY = dy / distance;
+                    let force = (mouse.radius - distance) / mouse.radius;
+                    let directionX = forceDirectionX * force * this.density;
+                    let directionY = forceDirectionY * force * this.density;
+                    
+                    this.x -= directionX;
+                    this.y -= directionY;
+                } else {
+                    // Retorno a la posición base
+                    if (this.x !== this.baseX) {
+                        let dx = this.x - this.baseX;
+                        this.x -= dx / 15;
+                    }
+                    if (this.y !== this.baseY) {
+                        let dy = this.y - this.baseY;
+                        this.y -= dy / 15;
+                    }
+                }
+                this.draw();
+            }
+        }
+
+        function initParticles() {
+            particles = [];
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+            let numberOfParticles = (canvas.width * canvas.height) / 7000;
+            for (let i = 0; i < numberOfParticles; i++) {
+                let x = Math.random() * canvas.width;
+                let y = Math.random() * canvas.height;
+                particles.push(new Particle(x, y));
+            }
+        }
+
+        function animateParticles() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            for (let i = 0; i < particles.length; i++) {
+                particles[i].update();
+            }
+            requestAnimationFrame(animateParticles);
+        }
+
+        initParticles();
+        animateParticles();
+    };
+
     window.onload = () => {
         buildFilters();
         applyFilters();
+        initAntigravity(); // <--- Arranca el efecto aquí
     };
     </script>
 </body></html>"""
