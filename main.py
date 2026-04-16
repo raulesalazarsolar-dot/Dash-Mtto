@@ -1,24 +1,36 @@
-import os
+import io
+import base64
 import json
+import os
 import unicodedata
+from urllib.parse import urlparse, unquote
 from datetime import datetime
 from zoneinfo import ZoneInfo
-import pandas as pd
+from PIL import Image
+
+# Librerías de SharePoint
+from office365.sharepoint.client_context import ClientContext
+from office365.runtime.auth.user_credential import UserCredential
 
 # ==========================================
-# 1. CONFIGURACIÓN GOOGLE DRIVE / GITHUB
+# 1. CONFIGURACIÓN (SHAREPOINT + GITHUB)
 # ==========================================
-GDRIVE_FILE_ID = "16uSilZ3IKizJ0GjO4YeatrrswdoVfw_B"
-CSV_URL = f"https://drive.google.com/uc?export=download&id={GDRIVE_FILE_ID}"
+SITE_URL = "https://teams.wal-mart.com/sites/EquipoPlanificacin"
+LIST_NAME = "Seguimiento Infraestructura"
+
+# ⚠️ SEGURIDAD GITHUB: Lee la clave desde "GitHub Secrets" (SP_PASSWORD). 
+# Si no la encuentra (como en tu PC local), usa la tuya por defecto.
+USERNAME = os.environ.get("SP_USERNAME")
+PASSWORD = os.environ.get("SP_PASSWORD")
 
 # Archivo de salida para GitHub Pages
 OUTPUT_HTML = "index.html"
 
 # ==========================================
-# 2. UTILIDADES DE LIMPIEZA
+# 2. UTILIDADES Y "SABUESO DE FOTOS"
 # ==========================================
 def limpiar(val):
-    if pd.isna(val) or val is None: return ""
+    if val is None: return ""
     s = str(val).strip()
     if s == "0" or s == "0.0": return "0"
     if s.lower() == "nan": return "" 
@@ -30,75 +42,112 @@ def normalizar_texto(texto):
     return ''.join(c for c in unicodedata.normalize('NFD', s) if unicodedata.category(c) != 'Mn')
 
 def formatear_fecha(texto_fecha):
-    if not texto_fecha or pd.isna(texto_fecha): return "--"
+    if not texto_fecha: return "--"
     try:
         s_fecha = str(texto_fecha)
+        if "T" in s_fecha: return datetime.strptime(s_fecha.split("T")[0], "%Y-%m-%d").strftime("%d-%m-%Y")
+        if isinstance(texto_fecha, datetime): return texto_fecha.strftime("%d-%m-%Y")
         if " " in s_fecha: return s_fecha.split(" ")[0]
         return s_fecha
     except: return str(texto_fecha)
 
+def descargar_foto_por_url(ctx, url):
+    try:
+        url = unquote(url)
+        if url.startswith("http"): url = urlparse(url).path
+        
+        file_content = io.BytesIO()
+        ctx.web.get_file_by_server_relative_url(url).download(file_content).execute_query()
+        file_content.seek(0)
+        
+        if len(file_content.getvalue()) > 0:
+            with Image.open(file_content) as img:
+                if img.mode != "RGB": img = img.convert("RGB")
+                img.thumbnail((400, 400)) # Compresión para web
+                buf = io.BytesIO()
+                img.save(buf, format='JPEG', quality=60)
+                return f"data:image/jpeg;base64,{base64.b64encode(buf.getvalue()).decode('utf-8')}"
+    except Exception:
+        pass
+    return None
+
+def extraer_foto_columna(ctx, p, col_name, item_id):
+    img_b64 = None
+    json_raw = p.get(col_name)
+    if json_raw:
+        try:
+            data = json.loads(json_raw) if isinstance(json_raw, str) else json_raw
+            if isinstance(data, dict):
+                url = data.get("serverRelativeUrl") or data.get("serverUrl") or data.get("Url")
+                filename = data.get("fileName")
+                if url: 
+                    img_b64 = descargar_foto_por_url(ctx, url)
+                if not img_b64 and filename:
+                    rel_site = SITE_URL.replace("https://teams.wal-mart.com", "")
+                    url_adj = f"{rel_site}/Lists/{LIST_NAME}/Attachments/{item_id}/{filename}"
+                    img_b64 = descargar_foto_por_url(ctx, url_adj)
+        except: pass
+    return img_b64
+
 # ==========================================
-# 3. EXTRACCIÓN Y PROCESAMIENTO DEL CSV
+# 3. EXTRACCIÓN PRINCIPAL (SHAREPOINT API)
 # ==========================================
 def main():
-    print("🚀 INICIANDO EXTRACCIÓN DESDE GOOGLE DRIVE...")
-    
     try:
-        # Descargamos y leemos el CSV
-        df = pd.read_csv(CSV_URL, encoding='utf-8')
+        print("🚀 INICIANDO EXTRACCIÓN DIRECTA DESDE SHAREPOINT...")
         
-        # Limpiamos los espacios en blanco de los encabezados
-        df.columns = df.columns.str.strip()
+        ctx = ClientContext(SITE_URL).with_credentials(UserCredential(USERNAME, PASSWORD))
+        sp_list = ctx.web.lists.get_by_title(LIST_NAME)
         
-        total_main = len(df)
-        print(f" ✅ Se cargaron {total_main} registros del CSV.")
-
-        # Mapeo con los nombres de las columnas (ya limpios de espacios)
-        MAPEO = {
-            "id": "ID", 
-            "semana": "Semana",
-            "actividad": "Actividad",
-            "titulo": "Tag", 
-            "status": "Status", 
-            "prioridad": "Prioridad", 
-            "ejecutor": "Responsable", 
-            "ubicacion": "Ubicación",      
-            "sub_ubi": "Sub Ubicación",   
-            "ot": "OT", 
-            "zona": "Zona", 
-            "f_lev": "Levantamiento",
-            "f_cie": "Cierre",
-            "observacion": "Observación",  
-            "obs2": "Observación 2", 
-            "clase": "Clase M" 
-        }
-
+        print("   ⏳ Solicitando registros y adjuntos...")
+        
+        columnas_req = [
+            "Id", "Title", "LinkTitle", "field_2", "field_3", "field_4", 
+            "field_5", "field_6", "field_7", "Responsable", "field_10", 
+            "field_11", "field_14", "field_15", "Antes", "Despues", 
+            "field_1", "ClaseM", "Zona", "Attachments", "AttachmentFiles"
+        ]
+        
+        try:
+            items = sp_list.items.select(columnas_req).expand(["AttachmentFiles"]).top(5000).get().execute_query()
+        except Exception:
+            columnas_req.remove("AttachmentFiles")
+            items = sp_list.items.select(columnas_req).top(5000).get().execute_query()
+            
+        total_main = len(items)
+        print(f"   ✅ Se descargaron {total_main} registros brutos.")
+        
         db_json = {}
-        for idx, row in df.iterrows():
-            print(f"   ... Procesando OT {idx+1} de {total_main}", end='\r')
+        for idx, item in enumerate(items):
+            print(f"      ... Procesando OT {idx+1} de {total_main}", end='\r')
+            p = item.properties
+            item_id = int(p.get("Id", 0))
             
-            item_id = int(row.get(MAPEO["id"], idx + 1)) if not pd.isna(row.get(MAPEO["id"])) else idx + 1
-            
-            semana_val = limpiar(row.get(MAPEO["semana"]))
+            semana_val = limpiar(p.get("field_1"))
+            if semana_val not in ["14"]: continue 
 
-            act_str = limpiar(row.get(MAPEO["actividad"]))
-            tag_id = limpiar(row.get(MAPEO["titulo"]))
+            act_str = limpiar(p.get("field_4")) 
+            tag_id = limpiar(p.get("LinkTitle"))
             titulo_final = act_str if act_str else (tag_id or f"OT #{item_id}")
 
-            status_txt = normalizar_texto(limpiar(row.get(MAPEO["status"]))) 
+            status_txt = normalizar_texto(limpiar(p.get("field_11"))) 
             if any(k in status_txt for k in ['ok', 'listo', 'cerrad', 'realiza', 'complet']): status = "realizada"
             elif any(k in status_txt for k in ['prog', 'planif']): status = "programado"
             elif any(k in status_txt for k in ['proceso', 'tratando', 'curso']): status = "en proceso"
             else: status = "pendiente"
 
-            prio_raw = normalizar_texto(limpiar(row.get(MAPEO["prioridad"]))) 
+            prio_raw = normalizar_texto(limpiar(p.get("field_10"))) 
             if "calavera" in prio_raw or "0" in prio_raw: prio = "0"
             elif "alta" in prio_raw or "1" in prio_raw: prio = "1"
             elif "media" in prio_raw or "2" in prio_raw: prio = "2"
             else: prio = "3"
 
-            clase_str = limpiar(row.get(MAPEO["clase"])).title()
+            clase_str = limpiar(p.get("ClaseM")).title()
             clase_final = clase_str if clase_str and clase_str.lower() != "none" else "General"
+
+            # Extracción de fotos en vivo desde SharePoint
+            img_antes = extraer_foto_columna(ctx, p, "Antes", item_id)
+            img_despues = extraer_foto_columna(ctx, p, "Despues", item_id)
 
             key_id = f"MTTO_{item_id}"
             db_json[key_id] = {
@@ -107,22 +156,22 @@ def main():
                 "titulo": titulo_final,
                 "tag": tag_id,
                 "semana": semana_val or "S/N",
-                "ejecutor": limpiar(row.get(MAPEO["ejecutor"])) or "Sin Asignar",
+                "ejecutor": limpiar(p.get("Responsable")) or "Sin Asignar",
                 "prioridad": prio,
-                "ubicacion": limpiar(row.get(MAPEO["ubicacion"])),
-                "sub_ubi": limpiar(row.get(MAPEO["sub_ubi"])),
-                "ot": limpiar(row.get(MAPEO["ot"])),
-                "zona": limpiar(row.get(MAPEO["zona"])),
-                "f_lev": formatear_fecha(row.get(MAPEO["f_lev"])),
-                "f_cie": formatear_fecha(row.get(MAPEO["f_cie"])),
+                "ubicacion": limpiar(p.get("field_5")),
+                "sub_ubi": limpiar(p.get("field_6")),
+                "ot": limpiar(p.get("field_7")),
+                "zona": limpiar(p.get("Zona")),
+                "f_lev": formatear_fecha(p.get("field_2")),
+                "f_cie": formatear_fecha(p.get("field_3")),
                 "actividad": act_str or "Sin descripción",
-                "observacion": limpiar(row.get(MAPEO["observacion"])),
-                "obs2": limpiar(row.get(MAPEO["obs2"])),
+                "observacion": limpiar(p.get("field_14")),
+                "obs2": limpiar(p.get("field_15")),
                 "status": status,
                 "clase": clase_final,
                 "origen": "act",
-                "img_antes": None,  
-                "img_despues": None 
+                "img_antes": img_antes,
+                "img_despues": img_despues
             }
             
         print("\n ✅ Procesamiento finalizado. Construyendo HTML...")
@@ -134,9 +183,10 @@ def main():
         traceback.print_exc()
 
 # ==========================================
-# 4. GENERADOR HTML
+# 4. GENERADOR HTML (CON EFECTO PARTÍCULAS)
 # ==========================================
 def generar_html_moderno(db_json):
+    # Usamos la zona horaria de Chile tal como lo tenías
     fecha_actual = datetime.now(ZoneInfo("America/Santiago")).strftime("%d/%m/%Y %H:%M")
     
     html_template = """<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Dashboard Mantenimiento</title>
@@ -575,14 +625,14 @@ def generar_html_moderno(db_json):
             htmlImgs += `<div class="gal-box"><span>📸 Antes</span><img src="${d.img_antes}" class="gal-img" onclick="openModal(this.src)"></div>`;
             hasImgs = true;
         } else {
-            htmlImgs += `<div class="gal-box"><span>📸 Antes</span><div style="height:150px; display:flex; align-items:center; justify-content:center; color:#cbd5e1; font-style:italic; font-weight:600; font-size:0.9rem;">Sin foto (Modo GitHub)</div></div>`;
+            htmlImgs += `<div class="gal-box"><span>📸 Antes</span><div style="height:150px; display:flex; align-items:center; justify-content:center; color:#cbd5e1; font-style:italic; font-weight:600; font-size:0.9rem;">Sin foto "Antes"</div></div>`;
         }
 
         if (d.img_despues) {
             htmlImgs += `<div class="gal-box"><span>📸 Después</span><img src="${d.img_despues}" class="gal-img" onclick="openModal(this.src)"></div>`;
             hasImgs = true;
         } else {
-            htmlImgs += `<div class="gal-box"><span>📸 Después</span><div style="height:150px; display:flex; align-items:center; justify-content:center; color:#cbd5e1; font-style:italic; font-weight:600; font-size:0.9rem;">Sin foto (Modo GitHub)</div></div>`;
+            htmlImgs += `<div class="gal-box"><span>📸 Después</span><div style="height:150px; display:flex; align-items:center; justify-content:center; color:#cbd5e1; font-style:italic; font-weight:600; font-size:0.9rem;">Sin foto "Después"</div></div>`;
         }
         htmlImgs += '</div>';
 
@@ -701,7 +751,6 @@ def generar_html_moderno(db_json):
         XLSX.writeFile(workbook, `Reporte_MTTO_${fechaEx}.xlsx`);
     }
 
-    // AQUI ESTA LA FUNCION CORREGIDA
     const isAseoAct = (d) => {
         let claseL = (d.clase || '').toLowerCase();
         return claseL.includes('aseo') || claseL.includes('limpieza');
@@ -1195,7 +1244,7 @@ def generar_html_moderno(db_json):
         });
     }
 
-    // --- NUEVO: EFECTO ANTIGRAVEDAD / PARTÍCULAS ---
+    // --- EFECTO ANTIGRAVEDAD / PARTÍCULAS ---
     const initAntigravity = () => {
         const canvas = document.createElement('canvas');
         canvas.id = 'antigravity-bg';
@@ -1209,10 +1258,9 @@ def generar_html_moderno(db_json):
         canvas.style.height = '100vh';
         canvas.style.zIndex = '-1'; 
         canvas.style.pointerEvents = 'none';
-        canvas.style.backgroundColor = '#f8fafc'; // Fondo general de tu aplicación
+        canvas.style.backgroundColor = '#f8fafc';
 
         let particles = [];
-        // Paleta oficial de Google Antigravity
         const colors = ['#4285F4', '#EA4335', '#FBBC05', '#34A853', '#A0C3FF', '#FCA297'];
         let mouse = { x: null, y: null, radius: 120 };
 
@@ -1264,7 +1312,6 @@ def generar_html_moderno(db_json):
                     this.x -= directionX;
                     this.y -= directionY;
                 } else {
-                    // Retorno a la posición base
                     if (this.x !== this.baseX) {
                         let dx = this.x - this.baseX;
                         this.x -= dx / 15;
@@ -1305,7 +1352,7 @@ def generar_html_moderno(db_json):
     window.onload = () => {
         buildFilters();
         applyFilters();
-        initAntigravity(); // <--- Arranca el efecto aquí
+        initAntigravity(); // Arranca el efecto
     };
     </script>
 </body></html>"""
