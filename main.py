@@ -20,8 +20,8 @@ LIST_NAME = "Seguimiento Infraestructura"
 
 # ⚠️ SEGURIDAD GITHUB: Lee la clave desde "GitHub Secrets" (SP_PASSWORD). 
 # Si no la encuentra (como en tu PC local), usa la tuya por defecto.
-USERNAME = os.environ.get("SP_USERNAME")
-PASSWORD = os.environ.get("SP_PASSWORD")
+USERNAME = os.environ.get("SP_USERNAME", "r0r0noi@cl.wal-mart.com")
+PASSWORD = os.environ.get("SP_PASSWORD", "fiXed.sPout+8")
 
 # Archivo de salida para GitHub Pages
 OUTPUT_HTML = "index.html"
@@ -124,7 +124,7 @@ def main():
             item_id = int(p.get("Id", 0))
             
             semana_val = limpiar(p.get("field_1"))
-            if semana_val not in ["14"]: continue 
+            # ELIMINADO EL FILTRO: if semana_val not in ["14"]: continue 
 
             act_str = limpiar(p.get("field_4")) 
             tag_id = limpiar(p.get("LinkTitle"))
@@ -314,7 +314,9 @@ def generar_html_moderno(db_json):
 
     <div class="top-bar">
         <div class="brand"><h2>⚙️ Panel Gestión de Actividades <span>SubGerencia de Mantenimiento</span></h2></div>
-        <div style="font-size:0.85rem; font-weight:600; opacity:0.9;">Actualizado: __FECHA_ACTUAL__</div>
+        <div style="font-size:0.85rem; font-weight:600; opacity:0.9;">
+            <span id="top_week_indicator">Actualizando...</span> | Actualizado: __FECHA_ACTUAL__
+        </div>
     </div>
     
     <div class="tabs-container">
@@ -501,6 +503,11 @@ def generar_html_moderno(db_json):
         const semVal = document.getElementById('f_semana') ? document.getElementById('f_semana').value : 'ALL';
         const zVal = document.getElementById('f_zona') ? document.getElementById('f_zona').value : 'ALL';
         const searchVal = document.getElementById('search_input') ? document.getElementById('search_input').value.toLowerCase().trim() : '';
+
+        // Actualizamos el título de la barra superior según el filtro de semana
+        let topWeekTitle = "Semanas Cargadas: " + (weeks.length > 0 ? weeks.join(', ') : "Ninguna");
+        if (semVal !== "ALL") topWeekTitle = "Semana " + semVal;
+        document.getElementById('top_week_indicator').innerText = topWeekTitle;
 
         return records.filter(d => {
             if (stVal !== 'ALL') {
