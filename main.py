@@ -124,8 +124,6 @@ def main():
             item_id = int(p.get("Id", 0))
             
             semana_val = limpiar(p.get("field_1"))
-            # ELIMINADO EL FILTRO: if semana_val not in ["14"]: continue 
-
             act_str = limpiar(p.get("field_4")) 
             tag_id = limpiar(p.get("LinkTitle"))
             titulo_final = act_str if act_str else (tag_id or f"OT #{item_id}")
@@ -186,7 +184,6 @@ def main():
 # 4. GENERADOR HTML (CON EFECTO PARTÍCULAS)
 # ==========================================
 def generar_html_moderno(db_json):
-    # Usamos la zona horaria de Chile tal como lo tenías
     fecha_actual = datetime.now(ZoneInfo("America/Santiago")).strftime("%d/%m/%Y %H:%M")
     
     html_template = """<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Dashboard Mantenimiento</title>
@@ -197,7 +194,6 @@ def generar_html_moderno(db_json):
     <style>
         :root { --primary: #0f172a; --secondary: #334155; --accent: #2563eb; --bg: #f8fafc; --border: #e2e8f0; --text: #1e293b; --muted: #64748b; --success: #10b981; --warn: #f59e0b; --danger: #ef4444; --info: #3b82f6; }
         * { box-sizing: border-box; outline: none; font-family: 'Segoe UI', system-ui, sans-serif; }
-        /* Fondo cambiado a transparente para mostrar el canvas debajo */
         body { background: transparent; color: var(--text); margin: 0; height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
         
         .top-bar { background: var(--primary); color: white; padding: 0 20px; height: 60px; display: flex; justify-content: space-between; align-items: center; flex-shrink: 0; z-index: 10; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
@@ -291,7 +287,11 @@ def generar_html_moderno(db_json):
         .dm-close:hover { opacity: 1; transform: scale(1.1); }
         .dm-body { padding: 0; overflow-y: auto; flex: 1; background: var(--bg); }
         .dm-table { width: 100%; border-collapse: collapse; background: white; font-size: 0.9rem; text-align: left; }
-        .dm-table th { background: #f8fafc; padding: 15px 20px; font-weight: 700; color: var(--secondary); border-bottom: 2px solid var(--border); position: sticky; top: 0; z-index: 10; text-transform: uppercase; font-size: 0.8rem; }
+        
+        /* Modificadas cabeceras de tabla para ser interactivas */
+        .dm-table th { background: #f8fafc; padding: 15px 20px; font-weight: 700; color: var(--secondary); border-bottom: 2px solid var(--border); position: sticky; top: 0; z-index: 10; text-transform: uppercase; font-size: 0.8rem; cursor: pointer; user-select: none; transition: background 0.2s; }
+        .dm-table th:hover { background: #e2e8f0; }
+        
         .dm-table td { padding: 15px 20px; border-bottom: 1px solid var(--border); color: var(--text); }
         .dm-table tr { transition: background 0.2s; }
         .dm-table tr:hover td { background: #eff6ff; cursor: pointer; }
@@ -504,7 +504,6 @@ def generar_html_moderno(db_json):
         const zVal = document.getElementById('f_zona') ? document.getElementById('f_zona').value : 'ALL';
         const searchVal = document.getElementById('search_input') ? document.getElementById('search_input').value.toLowerCase().trim() : '';
 
-        // Actualizamos el título de la barra superior según el filtro de semana
         let topWeekTitle = "Semanas Cargadas: " + (weeks.length > 0 ? weeks.join(', ') : "Ninguna");
         if (semVal !== "ALL") topWeekTitle = "Semana " + semVal;
         document.getElementById('top_week_indicator').innerText = topWeekTitle;
@@ -652,16 +651,93 @@ def generar_html_moderno(db_json):
         document.getElementById('modal').style.display = 'flex';
     }
 
+    // --- NUEVAS FUNCIONES PARA EL MODAL DE TABLAS ---
+    let currentSortCol = -1;
+    let currentSortDir = 'asc';
+
+    function sortModalTable(colIndex, thElement) {
+        const table = document.querySelector('.dm-table');
+        const tbody = table.querySelector('tbody');
+        const rows = Array.from(tbody.querySelectorAll('tr'));
+
+        // Resetear visualmente las cabeceras
+        table.querySelectorAll('th').forEach(th => {
+            th.innerText = th.innerText.replace(/ [▼▲]/g, ' ↕');
+        });
+
+        // Alternar dirección
+        if (currentSortCol === colIndex) {
+            currentSortDir = currentSortDir === 'asc' ? 'desc' : 'asc';
+        } else {
+            currentSortDir = 'asc';
+            currentSortCol = colIndex;
+        }
+
+        // Marcar cabecera actual
+        thElement.innerText = thElement.innerText.replace(' ↕', currentSortDir === 'asc' ? ' ▲' : ' ▼');
+
+        rows.sort((a, b) => {
+            const aCol = a.querySelectorAll('td')[colIndex];
+            const bCol = b.querySelectorAll('td')[colIndex];
+            
+            // Ignorar la fila de "No hay datos..." si existe
+            if(!aCol || !bCol || a.cells.length === 1) return 0;
+
+            let aText = aCol.innerText.trim().toLowerCase();
+            let bText = bCol.innerText.trim().toLowerCase();
+
+            // Intento de casteo a número para poder ordenar las OTs correctamente
+            let aNum = parseFloat(aText);
+            let bNum = parseFloat(bText);
+
+            if (!isNaN(aNum) && !isNaN(bNum)) {
+                return currentSortDir === 'asc' ? aNum - bNum : bNum - aNum;
+            }
+
+            // Ordenamiento alfabético estándar
+            if (aText < bText) return currentSortDir === 'asc' ? -1 : 1;
+            if (aText > bText) return currentSortDir === 'asc' ? 1 : -1;
+            return 0;
+        });
+
+        rows.forEach(row => tbody.appendChild(row));
+    }
+
+    function filterModalTable() {
+        const input = document.getElementById('modal_search_input');
+        const filter = input.value.toLowerCase();
+        const rows = document.querySelectorAll('.dm-table tbody tr');
+
+        rows.forEach(row => {
+            if(row.cells.length === 1) return; // Ignorar si es la fila vacía
+            const text = row.innerText.toLowerCase();
+            row.style.display = text.includes(filter) ? '' : 'none';
+        });
+    }
+
+    // --- MODIFICADO: Agregada cabecera interactiva y buscador ---
     function showDataModal(title, filterFn, colProp = 'ubicacion') {
         let colHeader = colProp === 'clase' ? 'Clase de Actividad' : 'Ubicación';
         
-        let html = `<div class="dm-header">
-            <h3>📊 Desglose: ${title}</h3>
-            <button class="dm-close" onclick="document.getElementById('data_modal').style.display='none'">&times;</button>
+        let html = `<div class="dm-header" style="flex-direction: column; align-items: stretch; gap: 15px;">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <h3 style="margin:0;">📊 Desglose: ${title}</h3>
+                <button class="dm-close" onclick="document.getElementById('data_modal').style.display='none'">&times;</button>
+            </div>
+            <input type="text" id="modal_search_input" placeholder="🔍 Filtrar contenido en esta tabla..." onkeyup="filterModalTable()" style="padding: 10px; border-radius: 6px; border: none; font-size: 0.9rem; color: #1e293b; width: 100%;">
         </div>
         <div class="dm-body">
             <table class="dm-table">
-                <thead><tr><th>OT / TAG</th><th>${colHeader}</th><th>Título / Actividad</th><th>Responsable</th><th>Estado</th><th>Observación</th></tr></thead>
+                <thead>
+                    <tr>
+                        <th onclick="sortModalTable(0, this)" title="Click para ordenar">OT / TAG ↕</th>
+                        <th onclick="sortModalTable(1, this)" title="Click para ordenar">${colHeader} ↕</th>
+                        <th onclick="sortModalTable(2, this)" title="Click para ordenar">Título / Actividad ↕</th>
+                        <th onclick="sortModalTable(3, this)" title="Click para ordenar">Responsable ↕</th>
+                        <th onclick="sortModalTable(4, this)" title="Click para ordenar">Estado ↕</th>
+                        <th onclick="sortModalTable(5, this)" title="Click para ordenar">Observación ↕</th>
+                    </tr>
+                </thead>
                 <tbody>`;
 
         let datosFiltrados = currentChartData.filter(filterFn);
@@ -694,6 +770,10 @@ def generar_html_moderno(db_json):
         html += `</tbody></table></div>`;
         document.getElementById('data_modal_content').innerHTML = html;
         document.getElementById('data_modal').style.display = 'flex';
+        
+        // Reiniciar variables de ordenamiento al abrir
+        currentSortCol = -1;
+        currentSortDir = 'asc';
     }
 
     function getFreshCanvas(id) {
