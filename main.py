@@ -124,6 +124,7 @@ def main():
             item_id = int(p.get("Id", 0))
             
             semana_val = limpiar(p.get("field_1"))
+
             act_str = limpiar(p.get("field_4")) 
             tag_id = limpiar(p.get("LinkTitle"))
             titulo_final = act_str if act_str else (tag_id or f"OT #{item_id}")
@@ -651,7 +652,7 @@ def generar_html_moderno(db_json):
         document.getElementById('modal').style.display = 'flex';
     }
 
-    // --- NUEVAS FUNCIONES PARA EL MODAL DE TABLAS ---
+    // --- ORDENAMIENTO EN TABLA (SIN BUSCADOR) ---
     let currentSortCol = -1;
     let currentSortDir = 'asc';
 
@@ -703,28 +704,13 @@ def generar_html_moderno(db_json):
         rows.forEach(row => tbody.appendChild(row));
     }
 
-    function filterModalTable() {
-        const input = document.getElementById('modal_search_input');
-        const filter = input.value.toLowerCase();
-        const rows = document.querySelectorAll('.dm-table tbody tr');
-
-        rows.forEach(row => {
-            if(row.cells.length === 1) return; // Ignorar si es la fila vacía
-            const text = row.innerText.toLowerCase();
-            row.style.display = text.includes(filter) ? '' : 'none';
-        });
-    }
-
-    // --- MODIFICADO: Agregada cabecera interactiva y buscador ---
+    // Modal rediseñado a su estado original (solo con las cabeceras clickeables)
     function showDataModal(title, filterFn, colProp = 'ubicacion') {
         let colHeader = colProp === 'clase' ? 'Clase de Actividad' : 'Ubicación';
         
-        let html = `<div class="dm-header" style="flex-direction: column; align-items: stretch; gap: 15px;">
-            <div style="display: flex; justify-content: space-between; align-items: center;">
-                <h3 style="margin:0;">📊 Desglose: ${title}</h3>
-                <button class="dm-close" onclick="document.getElementById('data_modal').style.display='none'">&times;</button>
-            </div>
-            <input type="text" id="modal_search_input" placeholder="🔍 Filtrar contenido en esta tabla..." onkeyup="filterModalTable()" style="padding: 10px; border-radius: 6px; border: none; font-size: 0.9rem; color: #1e293b; width: 100%;">
+        let html = `<div class="dm-header">
+            <h3>📊 Desglose: ${title}</h3>
+            <button class="dm-close" onclick="document.getElementById('data_modal').style.display='none'">&times;</button>
         </div>
         <div class="dm-body">
             <table class="dm-table">
