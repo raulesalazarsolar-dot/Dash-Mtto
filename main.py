@@ -18,12 +18,9 @@ from office365.runtime.auth.user_credential import UserCredential
 SITE_URL = "https://teams.wal-mart.com/sites/EquipoPlanificacin"
 LIST_NAME = "Seguimiento Infraestructura"
 
-# ⚠️ SEGURIDAD GITHUB: Lee la clave desde "GitHub Secrets" (SP_PASSWORD). 
-# Si no la encuentra (como en tu PC local), usa la tuya por defecto.
 USERNAME = os.environ.get("SP_USERNAME", "r0r0noi@cl.wal-mart.com")
 PASSWORD = os.environ.get("SP_PASSWORD", "fiXed.sPout+8")
 
-# Archivo de salida para GitHub Pages
 OUTPUT_HTML = "index.html"
 
 # ==========================================
@@ -105,7 +102,7 @@ def main():
             "Id", "Title", "LinkTitle", "field_2", "field_3", "field_4", 
             "field_5", "field_6", "field_7", "Responsable", "field_10", 
             "field_11", "field_14", "field_15", "Antes", "Despues", 
-            "field_1", "ClaseM", "Zona", "Attachments", "AttachmentFiles"
+            "field_1", "ClaseM", "Zona", "Planta", "Attachments", "AttachmentFiles"
         ]
         
         try:
@@ -121,9 +118,17 @@ def main():
         for idx, item in enumerate(items):
             print(f"      ... Procesando OT {idx+1} de {total_main}", end='\r')
             p = item.properties
-            item_id = int(p.get("Id", 0))
             
             semana_val = limpiar(p.get("field_1"))
+            # FILTRO ESTRICTO: Solo dejar semanas 18 y 19
+            if semana_val not in ["18", "19"]:
+                continue
+
+            item_id = int(p.get("Id", 0))
+
+            # ASIGNACIÓN DE PLANTA (Predeterminado: masas)
+            planta_raw = limpiar(p.get("Planta")).lower()
+            planta_final = "carne" if "carne" in planta_raw else "masas"
 
             act_str = limpiar(p.get("field_4")) 
             tag_id = limpiar(p.get("LinkTitle"))
@@ -144,7 +149,6 @@ def main():
             clase_str = limpiar(p.get("ClaseM")).title()
             clase_final = clase_str if clase_str and clase_str.lower() != "none" else "General"
 
-            # Extracción de fotos en vivo desde SharePoint
             img_antes = extraer_foto_columna(ctx, p, "Antes", item_id)
             img_despues = extraer_foto_columna(ctx, p, "Despues", item_id)
 
@@ -154,7 +158,8 @@ def main():
                 "id_real": item_id,
                 "titulo": titulo_final,
                 "tag": tag_id,
-                "semana": semana_val or "S/N",
+                "semana": semana_val,
+                "planta": planta_final,
                 "ejecutor": limpiar(p.get("Responsable")) or "Sin Asignar",
                 "prioridad": prio,
                 "ubicacion": limpiar(p.get("field_5")),
@@ -197,9 +202,19 @@ def generar_html_moderno(db_json):
         * { box-sizing: border-box; outline: none; font-family: 'Segoe UI', system-ui, sans-serif; }
         body { background: transparent; color: var(--text); margin: 0; height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
         
-        .top-bar { background: var(--primary); color: white; padding: 0 20px; height: 60px; display: flex; justify-content: space-between; align-items: center; flex-shrink: 0; z-index: 10; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+        .top-bar { background: var(--primary); color: white; padding: 0 20px; height: 60px; display: flex; justify-content: space-between; align-items: center; flex-shrink: 0; z-index: 10; box-shadow: 0 2px 5px rgba(0,0,0,0.1); transition: background-color 0.4s; }
+        .brand { flex: 1; }
         .brand h2 { margin: 0; font-size: 1.2rem; display:flex; align-items:center; gap: 8px; } 
         .brand span { opacity: 0.7; font-weight: 300; font-size: 0.95rem; }
+
+        /* Estilos Switch Planta */
+        .planta-switch { display: flex; align-items: center; justify-content: center; gap: 12px; background: rgba(255,255,255,0.15); padding: 5px 20px; border-radius: 30px; font-weight: bold; flex: 1; font-size: 0.9rem;}
+        .switch { position: relative; display: inline-block; width: 44px; height: 24px; }
+        .switch input { opacity: 0; width: 0; height: 0; }
+        .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #3b82f6; transition: .4s; border-radius: 34px; box-shadow: inset 0 1px 3px rgba(0,0,0,0.4); }
+        .slider:before { position: absolute; content: ""; height: 18px; width: 18px; left: 3px; bottom: 3px; background-color: white; transition: .4s; border-radius: 50%; box-shadow: 0 2px 4px rgba(0,0,0,0.2); }
+        input:checked + .slider { background-color: #7f1d1d; } /* Rojo oscuro para que contraste con la barra roja */
+        input:checked + .slider:before { transform: translateX(20px); }
         
         .tabs-container { background: white; border-bottom: 1px solid var(--border); padding: 0 20px; flex-shrink: 0; display:flex; justify-content: space-between; align-items: center; z-index: 5; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
         .tabs-nav { display: flex; gap: 15px; }
@@ -217,8 +232,8 @@ def generar_html_moderno(db_json):
         
         .f-group { margin-bottom: 15px; }
         .f-group label { font-size: 0.75rem; font-weight: 700; color: var(--muted); display: block; margin-bottom: 6px; text-transform: uppercase; }
-        select, input { width: 100%; padding: 10px; border: 1px solid var(--border); border-radius: 6px; font-size: 0.85rem; color: var(--text); }
-        select:focus, input:focus { border-color: var(--accent); box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.1); }
+        select, input[type="text"] { width: 100%; padding: 10px; border: 1px solid var(--border); border-radius: 6px; font-size: 0.85rem; color: var(--text); }
+        select:focus, input[type="text"]:focus { border-color: var(--accent); box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.1); }
         
         .btn-clean { background: white; border: 1px solid var(--danger); color: var(--danger); padding: 10px; border-radius: 6px; cursor: pointer; font-weight: 700; transition: 0.2s; width: 100%; text-transform: uppercase; font-size: 0.8rem; letter-spacing: 0.5px; }
         .btn-clean:hover { background: var(--danger); color: white; }
@@ -289,7 +304,6 @@ def generar_html_moderno(db_json):
         .dm-body { padding: 0; overflow-y: auto; flex: 1; background: var(--bg); }
         .dm-table { width: 100%; border-collapse: collapse; background: white; font-size: 0.9rem; text-align: left; }
         
-        /* Modificadas cabeceras de tabla para ser interactivas */
         .dm-table th { background: #f8fafc; padding: 15px 20px; font-weight: 700; color: var(--secondary); border-bottom: 2px solid var(--border); position: sticky; top: 0; z-index: 10; text-transform: uppercase; font-size: 0.8rem; cursor: pointer; user-select: none; transition: background 0.2s; }
         .dm-table th:hover { background: #e2e8f0; }
         
@@ -315,7 +329,18 @@ def generar_html_moderno(db_json):
 
     <div class="top-bar">
         <div class="brand"><h2>⚙️ Panel Gestión de Actividades <span>SubGerencia de Mantenimiento</span></h2></div>
-        <div style="font-size:0.85rem; font-weight:600; opacity:0.9;">
+        
+        <!-- SWITCH DE PLANTA -->
+        <div class="planta-switch">
+            <span style="opacity:0.9;">Masas</span>
+            <label class="switch">
+                <input type="checkbox" id="planta_toggle" onchange="togglePlanta()">
+                <span class="slider"></span>
+            </label>
+            <span style="opacity:0.9;">Carne</span>
+        </div>
+
+        <div style="flex: 1; text-align: right; font-size:0.85rem; font-weight:600; opacity:0.9;">
             <span id="top_week_indicator">Actualizando...</span> | Actualizado: __FECHA_ACTUAL__
         </div>
     </div>
@@ -434,23 +459,41 @@ def generar_html_moderno(db_json):
     let appState = { statusFilter: 'all', view: 'list' };
     let currentChartData = [];
     let chartInstances = {};
+    let currentPlanta = 'masas'; // Predeterminado a masas
     
     Chart.defaults.font.family = "'Segoe UI', system-ui, sans-serif";
     Chart.defaults.color = '#64748b';
 
+    function togglePlanta() {
+        const cb = document.getElementById('planta_toggle');
+        const topBar = document.querySelector('.top-bar');
+        
+        if(cb.checked) {
+            currentPlanta = 'carne';
+            topBar.style.backgroundColor = '#ef4444'; // Rojo para Carne
+        } else {
+            currentPlanta = 'masas';
+            topBar.style.backgroundColor = '#0f172a'; // Azul para Masas
+        }
+        applyFilters();
+    }
+
     function buildFilters() {
         const fDiv = document.getElementById('filters_dynamic');
         
-        const createSelect = (id, label, options) => {
+        const createSelect = (id, label, options, defValue = 'ALL') => {
             let sel = `<div class="f-group"><label>${label}</label><select id="${id}" onchange="applyFilters()">`;
             sel += `<option value="ALL">Todos</option>`;
-            options.forEach(o => { if(o) sel += `<option value="${o}">${o}</option>`; });
+            options.forEach(o => { 
+                if(o) sel += `<option value="${o}" ${o === defValue ? 'selected' : ''}>${o}</option>`; 
+            });
             sel += `</select></div>`;
             return sel;
         };
 
         let html = '';
-        html += createSelect('f_semana', '📆 Semana', weeks);
+        // Semana default 19
+        html += createSelect('f_semana', '📆 Semana', weeks, '19');
         html += createSelect('f_zona', '📍 Zona', [...new Set(records.map(x=>x.zona))].filter(Boolean).sort());
         html += createSelect('f_clase', '🛠️ Clase MTTO', [...new Set(records.map(x=>x.clase))].sort());
         html += createSelect('f_exec', '👷 Responsable', [...new Set(records.map(x=>x.ejecutor))].sort());
@@ -471,6 +514,9 @@ def generar_html_moderno(db_json):
     function resetFilters() {
         if(document.getElementById('search_input')) document.getElementById('search_input').value = '';
         document.querySelectorAll('.f-group select').forEach(sel => sel.value = "ALL");
+        
+        // Forzar semana 19 de nuevo al limpiar
+        if(document.getElementById('f_semana')) document.getElementById('f_semana').value = "19";
         applyFilters();
     }
 
@@ -510,6 +556,9 @@ def generar_html_moderno(db_json):
         document.getElementById('top_week_indicator').innerText = topWeekTitle;
 
         return records.filter(d => {
+            // Filtro Principal: Planta Switch
+            if (d.planta !== currentPlanta) return false;
+
             if (stVal !== 'ALL') {
                 if (stVal === 'abiertas' && d.status === 'realizada') return false;
                 else if (stVal !== 'abiertas' && d.status !== stVal) return false;
@@ -652,7 +701,6 @@ def generar_html_moderno(db_json):
         document.getElementById('modal').style.display = 'flex';
     }
 
-    // --- ORDENAMIENTO EN TABLA (SIN BUSCADOR) ---
     let currentSortCol = -1;
     let currentSortDir = 'asc';
 
@@ -661,12 +709,10 @@ def generar_html_moderno(db_json):
         const tbody = table.querySelector('tbody');
         const rows = Array.from(tbody.querySelectorAll('tr'));
 
-        // Resetear visualmente las cabeceras
         table.querySelectorAll('th').forEach(th => {
             th.innerText = th.innerText.replace(/ [▼▲]/g, ' ↕');
         });
 
-        // Alternar dirección
         if (currentSortCol === colIndex) {
             currentSortDir = currentSortDir === 'asc' ? 'desc' : 'asc';
         } else {
@@ -674,20 +720,17 @@ def generar_html_moderno(db_json):
             currentSortCol = colIndex;
         }
 
-        // Marcar cabecera actual
         thElement.innerText = thElement.innerText.replace(' ↕', currentSortDir === 'asc' ? ' ▲' : ' ▼');
 
         rows.sort((a, b) => {
             const aCol = a.querySelectorAll('td')[colIndex];
             const bCol = b.querySelectorAll('td')[colIndex];
             
-            // Ignorar la fila de "No hay datos..." si existe
             if(!aCol || !bCol || a.cells.length === 1) return 0;
 
             let aText = aCol.innerText.trim().toLowerCase();
             let bText = bCol.innerText.trim().toLowerCase();
 
-            // Intento de casteo a número para poder ordenar las OTs correctamente
             let aNum = parseFloat(aText);
             let bNum = parseFloat(bText);
 
@@ -695,7 +738,6 @@ def generar_html_moderno(db_json):
                 return currentSortDir === 'asc' ? aNum - bNum : bNum - aNum;
             }
 
-            // Ordenamiento alfabético estándar
             if (aText < bText) return currentSortDir === 'asc' ? -1 : 1;
             if (aText > bText) return currentSortDir === 'asc' ? 1 : -1;
             return 0;
@@ -704,7 +746,6 @@ def generar_html_moderno(db_json):
         rows.forEach(row => tbody.appendChild(row));
     }
 
-    // Modal rediseñado a su estado original (solo con las cabeceras clickeables)
     function showDataModal(title, filterFn, colProp = 'ubicacion') {
         let colHeader = colProp === 'clase' ? 'Clase de Actividad' : 'Ubicación';
         
@@ -757,7 +798,6 @@ def generar_html_moderno(db_json):
         document.getElementById('data_modal_content').innerHTML = html;
         document.getElementById('data_modal').style.display = 'flex';
         
-        // Reiniciar variables de ordenamiento al abrir
         currentSortCol = -1;
         currentSortDir = 'asc';
     }
@@ -799,6 +839,7 @@ def generar_html_moderno(db_json):
             "Levantamiento": d.f_lev,
             "Cierre": d.f_cie,
             "Actividad": d.actividad,
+            "Planta": d.planta,
             "Clase": d.clase,
             "Zona": d.zona,
             "Ubicación": d.ubicacion,
@@ -815,7 +856,7 @@ def generar_html_moderno(db_json):
         XLSX.utils.book_append_sheet(workbook, worksheet, "Base de Datos");
 
         const anchos = [
-            { wch: 12 }, { wch: 12 }, { wch: 40 }, { wch: 15 }, { wch: 15 }, { wch: 20 }, 
+            { wch: 12 }, { wch: 12 }, { wch: 40 }, { wch: 15 }, { wch: 15 }, { wch: 15 }, { wch: 20 }, 
             { wch: 20 }, { wch: 15 }, { wch: 20 }, { wch: 15 }, { wch: 50 }, { wch: 10 }
         ];
         worksheet['!cols'] = anchos;
