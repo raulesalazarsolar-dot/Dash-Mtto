@@ -340,8 +340,9 @@ def generar_html_moderno(db_json):
             <span style="opacity:0.9;">Carne</span>
         </div>
 
-        <div style="flex: 1; text-align: right; font-size:0.85rem; font-weight:600; opacity:0.9;">
-            <span id="top_week_indicator">Actualizando...</span> | Actualizado: __FECHA_ACTUAL__
+        <!-- Nuevo Logo en la barra superior -->
+        <div style="flex: 1; display: flex; justify-content: flex-end; align-items: center; padding-right: 10px;">
+            <img src="https://upload.wikimedia.org/wikipedia/commons/b/b1/Walmart_logo_%282008%29.svg" alt="Walmart Logo" style="height: 35px; object-fit: contain; opacity: 0.95; filter: brightness(0) invert(1);">
         </div>
     </div>
     
@@ -376,6 +377,12 @@ def generar_html_moderno(db_json):
                 </div>
                 <div class="prog-title"><span>Cumplimiento Global</span><span id="k_perc">0%</span></div>
                 <div class="progress-bar-container"><div id="bar_fill" class="progress-bar-fill"></div></div>
+                
+                <!-- Indicador de Fecha y Semana trasladado aquí -->
+                <div style="margin-top: 15px; padding-top: 12px; border-top: 1px dashed var(--border); text-align: center; font-size: 0.75rem; color: var(--muted); font-weight: 700; text-transform: uppercase;">
+                    <span id="top_week_indicator" style="color: var(--primary);">Actualizando...</span><br>
+                    <span style="opacity: 0.7; font-size: 0.65rem; display: inline-block; margin-top: 4px; font-weight: 600;">Actualizado: __FECHA_ACTUAL__</span>
+                </div>
             </div>
         </div>
 
