@@ -1524,4 +1524,15 @@ def generar_html_moderno(db_json):
         initAntigravity(); // Arranca el efecto
     };
     </script>
-</body></html>
+</body></html>"""
+
+    full_html = html_template.replace("__FECHA_ACTUAL__", fecha_actual)
+    full_html = full_html.replace("__DB_JSON_DATA__", json.dumps(db_json))
+    
+    with open(OUTPUT_HTML, "w", encoding="utf-8") as f: 
+        f.write(full_html)
+        
+    print(f"\n✅ REPORTE GENERADO CON ÉXITO: {OUTPUT_HTML}")
+
+if __name__ == "__main__":
+    main()
