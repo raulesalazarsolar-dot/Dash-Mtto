@@ -98,12 +98,13 @@ def main():
         
         print("   ⏳ Solicitando registros y adjuntos...")
         
-        # Agregamos "HH" a las columnas solicitadas
+        # OJO AQUÍ: Usamos los nombres internos exactos de SharePoint
         columnas_req = [
             "Id", "Title", "LinkTitle", "field_2", "field_3", "field_4", 
             "field_5", "field_6", "field_7", "Responsable", "field_10", 
             "field_11", "field_14", "field_15", "Antes", "Despues", 
-            "field_1", "ClaseM", "Zona", "Planta", "Attachments", "AttachmentFiles", "HH"
+            "field_1", "ClaseM", "Zona", "Planta", "Attachments", "AttachmentFiles", "HH", 
+            "Duraci_x00f3_n_x0028_HR_x0029_", "CantidadPersonas"
         ]
         
         try:
@@ -127,7 +128,7 @@ def main():
 
             item_id = int(p.get("Id", 0))
 
-            # ASIGNACIÓN DE PLANTA (Predeterminado: masas)
+            # ASIGNACIÓN DE PLANTA
             planta_raw = limpiar(p.get("Planta")).lower()
             planta_final = "carne" if "carne" in planta_raw else "masas"
 
@@ -153,7 +154,10 @@ def main():
             img_antes = extraer_foto_columna(ctx, p, "Antes", item_id)
             img_despues = extraer_foto_columna(ctx, p, "Despues", item_id)
 
-            # Extraemos la HH
+            # Extracción de Duración, Personas y HH usando nombres internos
+            duracion_val = limpiar(p.get("Duraci_x00f3_n_x0028_HR_x0029_"))
+            dotacion_val = limpiar(p.get("CantidadPersonas"))
+            
             hh_raw = p.get("HH")
             try:
                 hh_val = float(str(hh_raw).replace(',', '.')) if hh_raw else 0.0
@@ -184,7 +188,9 @@ def main():
                 "origen": "act",
                 "img_antes": img_antes,
                 "img_despues": img_despues,
-                "hh": hh_val
+                "hh": hh_val,
+                "duracion": duracion_val,
+                "dotacion": dotacion_val
             }
             
         print("\n ✅ Procesamiento finalizado. Construyendo HTML...")
@@ -349,7 +355,7 @@ def generar_html_moderno(db_json):
             <span style="opacity:0.9;">Carne</span>
         </div>
 
-        <!-- Nuevo Logo en la barra superior -->
+        <!-- Logo en la barra superior -->
         <div style="flex: 1; display: flex; justify-content: flex-end; align-items: center; padding-right: 10px;">
             <img src="https://upload.wikimedia.org/wikipedia/commons/b/b1/Walmart_logo_%282008%29.svg" alt="Walmart Logo" style="height: 35px; object-fit: contain; opacity: 0.95; filter: brightness(0) invert(1);">
         </div>
@@ -387,7 +393,6 @@ def generar_html_moderno(db_json):
                 <div class="prog-title"><span>Cumplimiento Global</span><span id="k_perc">0%</span></div>
                 <div class="progress-bar-container"><div id="bar_fill" class="progress-bar-fill"></div></div>
                 
-                <!-- Indicador de Fecha y Semana trasladado aquí -->
                 <div style="margin-top: 15px; padding-top: 12px; border-top: 1px dashed var(--border); text-align: center; font-size: 0.75rem; color: var(--muted); font-weight: 700; text-transform: uppercase;">
                     <span id="top_week_indicator" style="color: var(--primary);">Actualizando...</span><br>
                     <span style="opacity: 0.7; font-size: 0.65rem; display: inline-block; margin-top: 4px; font-weight: 600;">Actualizado: __FECHA_ACTUAL__</span>
@@ -407,8 +412,14 @@ def generar_html_moderno(db_json):
                 <div id="empty_state" class="empty-state"><div style="font-size:4rem; margin-bottom:15px;">📋</div><h3 style="margin:0">Selecciona una OT</h3><p>Usa la lista izquierda para ver detalles.</p></div>
                 <div id="detail_view" class="detail-content" style="display:none">
                     <div class="detail-header">
+                        <!-- ZONA SUPERIOR DE LA TARJETA -->
                         <div class="dh-top">
-                            <div><span id="d_status" class="tag st-ok">STATUS</span></div>
+                            <div style="display:flex; align-items:center; gap:15px; flex-wrap:wrap;">
+                                <span id="d_status" class="tag st-ok">STATUS</span>
+                                <div id="d_extra_info" style="display:none; gap:12px; font-size:0.8rem; color:var(--secondary); font-weight:700; align-items:center; background:#f8fafc; padding:4px 12px; border-radius:6px; border:1px solid var(--border);">
+                                    <!-- Aquí va la nueva info de tiempos -->
+                                </div>
+                            </div>
                             <div id="d_prio_lbl">PRIO</div>
                         </div>
                         <h2 id="d_title">Título de la Actividad</h2>
@@ -475,7 +486,7 @@ def generar_html_moderno(db_json):
     let appState = { statusFilter: 'all', view: 'list' };
     let currentChartData = [];
     let chartInstances = {};
-    let currentPlanta = 'masas'; // Predeterminado a masas
+    let currentPlanta = 'masas';
     
     Chart.defaults.font.family = "'Segoe UI', system-ui, sans-serif";
     Chart.defaults.color = '#64748b';
@@ -486,10 +497,10 @@ def generar_html_moderno(db_json):
         
         if(cb.checked) {
             currentPlanta = 'carne';
-            topBar.style.backgroundColor = '#ef4444'; // Rojo para Carne
+            topBar.style.backgroundColor = '#ef4444';
         } else {
             currentPlanta = 'masas';
-            topBar.style.backgroundColor = '#0f172a'; // Azul para Masas
+            topBar.style.backgroundColor = '#0f172a';
         }
         applyFilters();
     }
@@ -508,7 +519,6 @@ def generar_html_moderno(db_json):
         };
 
         let html = '';
-        // Semana default 19
         html += createSelect('f_semana', '📆 Semana', weeks, '19');
         html += createSelect('f_zona', '📍 Zona', [...new Set(records.map(x=>x.zona))].filter(Boolean).sort());
         html += createSelect('f_clase', '🛠️ Clase MTTO', [...new Set(records.map(x=>x.clase))].sort());
@@ -530,8 +540,6 @@ def generar_html_moderno(db_json):
     function resetFilters() {
         if(document.getElementById('search_input')) document.getElementById('search_input').value = '';
         document.querySelectorAll('.f-group select').forEach(sel => sel.value = "ALL");
-        
-        // Forzar semana 19 de nuevo al limpiar
         if(document.getElementById('f_semana')) document.getElementById('f_semana').value = "19";
         applyFilters();
     }
@@ -572,7 +580,6 @@ def generar_html_moderno(db_json):
         document.getElementById('top_week_indicator').innerText = topWeekTitle;
 
         return records.filter(d => {
-            // Filtro Principal: Planta Switch
             if (d.planta !== currentPlanta) return false;
 
             if (stVal !== 'ALL') {
@@ -662,6 +669,22 @@ def generar_html_moderno(db_json):
         else if (d.status === 'en proceso') { stBadge.innerText = '🔨 EN PROCESO'; stBadge.className = 'tag st-proc'; }
         else { stBadge.innerText = '⚠️ PENDIENTE'; stBadge.className = 'tag st-pend'; }
         
+        // --- INFORMACIÓN EXTRA EN LA BARRA SUPERIOR ROJA ---
+        let durText = d.duracion ? `<span title="Tiempo de Ejecución (h)">⏱️ Ejecución: ${d.duracion}h</span>` : '';
+        let dotText = d.dotacion ? `<span title="Dotación (Cantidad de Personas)">👥 Dotación: ${d.dotacion}</span>` : '';
+        let hhText = d.hh > 0 ? `<span title="Duración Total HH">⌛ Total: ${d.hh % 1 === 0 ? d.hh : d.hh.toFixed(1)} HH</span>` : '';
+        
+        let extraHtml = [durText, dotText, hhText].filter(Boolean).join('<span style="color:#cbd5e1; margin:0 4px;">|</span>');
+        
+        const extraDiv = document.getElementById('d_extra_info');
+        if(extraHtml) {
+            extraDiv.style.display = 'flex';
+            extraDiv.innerHTML = extraHtml;
+        } else {
+            extraDiv.style.display = 'none';
+        }
+        // ---------------------------------------------------
+
         let pl = d.prioridad;
         if(pl==='0') pl='<span class="prio-flag p-crit">🚨 ALTA / CRÍTICA</span>';
         else if(pl==='1') pl='<span class="prio-flag p-alta">🔴 ALTA</span>';
@@ -865,7 +888,9 @@ def generar_html_moderno(db_json):
             "Status": d.status.toUpperCase(),
             "Observación": d.observacion,
             "Semana": d.semana,
-            "HH": d.hh
+            "Tiempo Ejecución (h)": d.duracion,
+            "Dotación": d.dotacion,
+            "Duración Total (HH)": d.hh
         }));
 
         const worksheet = XLSX.utils.json_to_sheet(datosExcel);
@@ -874,7 +899,7 @@ def generar_html_moderno(db_json):
 
         const anchos = [
             { wch: 12 }, { wch: 12 }, { wch: 40 }, { wch: 15 }, { wch: 15 }, { wch: 15 }, { wch: 20 }, 
-            { wch: 20 }, { wch: 15 }, { wch: 20 }, { wch: 15 }, { wch: 50 }, { wch: 10 }, { wch: 10 }
+            { wch: 20 }, { wch: 15 }, { wch: 20 }, { wch: 15 }, { wch: 50 }, { wch: 10 }, { wch: 15 }, { wch: 10 }, { wch: 15 }
         ];
         worksheet['!cols'] = anchos;
 
@@ -995,7 +1020,6 @@ def generar_html_moderno(db_json):
         let colMtto = percMtto >= 80 ? '#10b981' : (percMtto >= 40 ? '#f59e0b' : '#ef4444');
         let colGen = percGen >= 80 ? '#1d4ed8' : (percGen >= 40 ? '#f59e0b' : '#ef4444');
 
-        // LÓGICA CONDICIONAL DE HH > 0
         let textHHAseo = hhAseo > 0 ? ` / <b>${hhAseo % 1 === 0 ? hhAseo : hhAseo.toFixed(1)} HH necesarias</b>` : "";
         let textHHMtto = hhMtto > 0 ? ` / <b>${hhMtto % 1 === 0 ? hhMtto : hhMtto.toFixed(1)} HH necesarias</b>` : "";
         let textHHGen = hhGen > 0 ? ` / <b>${hhGen % 1 === 0 ? hhGen : hhGen.toFixed(1)} HH necesarias</b>` : "";
@@ -1501,7 +1525,7 @@ def generar_html_moderno(db_json):
     };
     </script>
 </body></html>"""
-    
+
     full_html = html_template.replace("__FECHA_ACTUAL__", fecha_actual)
     full_html = full_html.replace("__DB_JSON_DATA__", json.dumps(db_json))
     
