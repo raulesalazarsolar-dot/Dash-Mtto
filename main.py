@@ -98,11 +98,12 @@ def main():
         
         print("   ⏳ Solicitando registros y adjuntos...")
         
+        # Agregamos "HH" a las columnas solicitadas
         columnas_req = [
             "Id", "Title", "LinkTitle", "field_2", "field_3", "field_4", 
             "field_5", "field_6", "field_7", "Responsable", "field_10", 
             "field_11", "field_14", "field_15", "Antes", "Despues", 
-            "field_1", "ClaseM", "Zona", "Planta", "Attachments", "AttachmentFiles"
+            "field_1", "ClaseM", "Zona", "Planta", "Attachments", "AttachmentFiles", "HH"
         ]
         
         try:
@@ -152,6 +153,13 @@ def main():
             img_antes = extraer_foto_columna(ctx, p, "Antes", item_id)
             img_despues = extraer_foto_columna(ctx, p, "Despues", item_id)
 
+            # Extraemos la HH
+            hh_raw = p.get("HH")
+            try:
+                hh_val = float(str(hh_raw).replace(',', '.')) if hh_raw else 0.0
+            except:
+                hh_val = 0.0
+
             key_id = f"MTTO_{item_id}"
             db_json[key_id] = {
                 "key_id": key_id,
@@ -175,7 +183,8 @@ def main():
                 "clase": clase_final,
                 "origen": "act",
                 "img_antes": img_antes,
-                "img_despues": img_despues
+                "img_despues": img_despues,
+                "hh": hh_val
             }
             
         print("\n ✅ Procesamiento finalizado. Construyendo HTML...")
@@ -855,7 +864,8 @@ def generar_html_moderno(db_json):
             "Ejecutor": d.ejecutor,
             "Status": d.status.toUpperCase(),
             "Observación": d.observacion,
-            "Semana": d.semana
+            "Semana": d.semana,
+            "HH": d.hh
         }));
 
         const worksheet = XLSX.utils.json_to_sheet(datosExcel);
@@ -864,7 +874,7 @@ def generar_html_moderno(db_json):
 
         const anchos = [
             { wch: 12 }, { wch: 12 }, { wch: 40 }, { wch: 15 }, { wch: 15 }, { wch: 15 }, { wch: 20 }, 
-            { wch: 20 }, { wch: 15 }, { wch: 20 }, { wch: 15 }, { wch: 50 }, { wch: 10 }
+            { wch: 20 }, { wch: 15 }, { wch: 20 }, { wch: 15 }, { wch: 50 }, { wch: 10 }, { wch: 10 }
         ];
         worksheet['!cols'] = anchos;
 
@@ -902,9 +912,9 @@ def generar_html_moderno(db_json):
         if(!data) return;
 
         let stats = { ok:0, pend:0, proc:0, prog:0, ex:{}, loc:{}, wCounts:{}, cCounts:{} };
-        let totAseo = 0, okAseo = 0;
-        let totMtto = 0, okMtto = 0;
-        let totGen = data.length, okGen = 0;
+        let totAseo = 0, okAseo = 0, hhAseo = 0;
+        let totMtto = 0, okMtto = 0, hhMtto = 0;
+        let totGen = data.length, okGen = 0, hhGen = 0;
         
         let statsArea = {
             'Mecánico': { total: 0, ok: 0, proc: 0, pend: 0 },
@@ -921,6 +931,9 @@ def generar_html_moderno(db_json):
             let isProg = (d.status === 'programado');
             let isPend = (d.status === 'pendiente');
 
+            let hhActual = parseFloat(d.hh) || 0;
+            hhGen += hhActual;
+
             if(isOk) { stats.ok++; okGen++; }
             else if(isProg) { stats.prog++; }
             else if(isProc) { stats.proc++; }
@@ -932,9 +945,11 @@ def generar_html_moderno(db_json):
             if(isAseo) {
                 totAseo++;
                 if(isOk) okAseo++;
+                hhAseo += hhActual;
             } else {
                 totMtto++;
                 if(isOk) okMtto++;
+                hhMtto += hhActual;
             }
 
             const e = d.ejecutor || 'Sin Asignar';
@@ -980,13 +995,18 @@ def generar_html_moderno(db_json):
         let colMtto = percMtto >= 80 ? '#10b981' : (percMtto >= 40 ? '#f59e0b' : '#ef4444');
         let colGen = percGen >= 80 ? '#1d4ed8' : (percGen >= 40 ? '#f59e0b' : '#ef4444');
 
+        // LÓGICA CONDICIONAL DE HH > 0
+        let textHHAseo = hhAseo > 0 ? ` / <b>${hhAseo % 1 === 0 ? hhAseo : hhAseo.toFixed(1)} HH necesarias</b>` : "";
+        let textHHMtto = hhMtto > 0 ? ` / <b>${hhMtto % 1 === 0 ? hhMtto : hhMtto.toFixed(1)} HH necesarias</b>` : "";
+        let textHHGen = hhGen > 0 ? ` / <b>${hhGen % 1 === 0 ? hhGen : hhGen.toFixed(1)} HH necesarias</b>` : "";
+
         let summaryHtml = `
             <div class="summary-block">
                 <div class="summary-header">
                     <span class="summary-title" style="color:#eab308;">🧹 Aseo / Sanitización y Seg.</span>
                     <span class="summary-perc" style="color:${colAseo};">${percAseo}%</span>
                 </div>
-                <div class="summary-sub">De un total de <b>${totAseo}</b>, <b>${okAseo}</b> realizadas</div>
+                <div class="summary-sub">De un total de <b>${totAseo}</b>, <b>${okAseo}</b> realizadas${textHHAseo}</div>
                 <div class="summary-bar-bg">
                     <div class="summary-bar-fill" style="width:${percAseo}%; background:${colAseo};"></div>
                 </div>
@@ -997,7 +1017,7 @@ def generar_html_moderno(db_json):
                     <span class="summary-title" style="color:#8b5cf6;">🔧 Mantenimiento</span>
                     <span class="summary-perc" style="color:${colMtto};">${percMtto}%</span>
                 </div>
-                <div class="summary-sub">De un total de <b>${totMtto}</b>, <b>${okMtto}</b> realizadas</div>
+                <div class="summary-sub">De un total de <b>${totMtto}</b>, <b>${okMtto}</b> realizadas${textHHMtto}</div>
                 <div class="summary-bar-bg">
                     <div class="summary-bar-fill" style="width:${percMtto}%; background:${colMtto};"></div>
                 </div>
@@ -1006,7 +1026,7 @@ def generar_html_moderno(db_json):
             <div class="summary-block" style="background:#eff6ff; border-color:#bfdbfe; text-align:center; padding: 20px 15px; margin-top: auto; margin-bottom: 0;">
                 <div style="font-size:0.8rem; color:#1e40af; font-weight:700; text-transform:uppercase; margin-bottom:5px;">Cumplimiento Plan FDS Total</div>
                 <div style="font-size:2rem; font-weight:800; color:${colGen};">${percGen}%</div>
-                <div style="font-size:0.85rem; color:#3b82f6; margin-top:5px;">De un total de <b>${totGen}</b> actividades</div>
+                <div style="font-size:0.85rem; color:#3b82f6; margin-top:5px;">De un total de <b>${totGen}</b> actividades${textHHGen}</div>
             </div>
         `;
         document.getElementById('summary_content').innerHTML = summaryHtml;
