@@ -98,7 +98,6 @@ def main():
         
         print("   ⏳ Solicitando registros y adjuntos...")
         
-        # OJO AQUÍ: Usamos los nombres internos exactos de SharePoint
         columnas_req = [
             "Id", "Title", "LinkTitle", "field_2", "field_3", "field_4", 
             "field_5", "field_6", "field_7", "Responsable", "field_10", 
@@ -154,7 +153,6 @@ def main():
             img_antes = extraer_foto_columna(ctx, p, "Antes", item_id)
             img_despues = extraer_foto_columna(ctx, p, "Despues", item_id)
 
-            # Extracción de Duración, Personas y HH usando nombres internos
             duracion_val = limpiar(p.get("Duraci_x00f3_n_x0028_HR_x0029_"))
             dotacion_val = limpiar(p.get("CantidadPersonas"))
             
@@ -202,7 +200,7 @@ def main():
         traceback.print_exc()
 
 # ==========================================
-# 4. GENERADOR HTML (CON EFECTO PARTÍCULAS)
+# 4. GENERADOR HTML
 # ==========================================
 def generar_html_moderno(db_json):
     fecha_actual = datetime.now(ZoneInfo("America/Santiago")).strftime("%d/%m/%Y %H:%M")
@@ -222,13 +220,12 @@ def generar_html_moderno(db_json):
         .brand h2 { margin: 0; font-size: 1.2rem; display:flex; align-items:center; gap: 8px; } 
         .brand span { opacity: 0.7; font-weight: 300; font-size: 0.95rem; }
 
-        /* Estilos Switch Planta */
         .planta-switch { display: flex; align-items: center; justify-content: center; gap: 12px; background: rgba(255,255,255,0.15); padding: 5px 20px; border-radius: 30px; font-weight: bold; flex: 1; font-size: 0.9rem;}
         .switch { position: relative; display: inline-block; width: 44px; height: 24px; }
         .switch input { opacity: 0; width: 0; height: 0; }
         .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #3b82f6; transition: .4s; border-radius: 34px; box-shadow: inset 0 1px 3px rgba(0,0,0,0.4); }
         .slider:before { position: absolute; content: ""; height: 18px; width: 18px; left: 3px; bottom: 3px; background-color: white; transition: .4s; border-radius: 50%; box-shadow: 0 2px 4px rgba(0,0,0,0.2); }
-        input:checked + .slider { background-color: #7f1d1d; } /* Rojo oscuro para que contraste con la barra roja */
+        input:checked + .slider { background-color: #7f1d1d; } 
         input:checked + .slider:before { transform: translateX(20px); }
         
         .tabs-container { background: white; border-bottom: 1px solid var(--border); padding: 0 20px; flex-shrink: 0; display:flex; justify-content: space-between; align-items: center; z-index: 5; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
@@ -355,7 +352,6 @@ def generar_html_moderno(db_json):
             <span style="opacity:0.9;">Carne</span>
         </div>
 
-        <!-- Logo en la barra superior -->
         <div style="flex: 1; display: flex; justify-content: flex-end; align-items: center; padding-right: 10px;">
             <img src="https://upload.wikimedia.org/wikipedia/commons/b/b1/Walmart_logo_%282008%29.svg" alt="Walmart Logo" style="height: 35px; object-fit: contain; opacity: 0.95; filter: brightness(0) invert(1);">
         </div>
@@ -412,13 +408,10 @@ def generar_html_moderno(db_json):
                 <div id="empty_state" class="empty-state"><div style="font-size:4rem; margin-bottom:15px;">📋</div><h3 style="margin:0">Selecciona una OT</h3><p>Usa la lista izquierda para ver detalles.</p></div>
                 <div id="detail_view" class="detail-content" style="display:none">
                     <div class="detail-header">
-                        <!-- ZONA SUPERIOR DE LA TARJETA -->
                         <div class="dh-top">
                             <div style="display:flex; align-items:center; gap:15px; flex-wrap:wrap;">
                                 <span id="d_status" class="tag st-ok">STATUS</span>
-                                <div id="d_extra_info" style="display:none; gap:12px; font-size:0.8rem; color:var(--secondary); font-weight:700; align-items:center; background:#f8fafc; padding:4px 12px; border-radius:6px; border:1px solid var(--border);">
-                                    <!-- Aquí va la nueva info de tiempos -->
-                                </div>
+                                <div id="d_extra_info" style="display:none; gap:12px; font-size:0.8rem; color:var(--secondary); font-weight:700; align-items:center; background:#f8fafc; padding:4px 12px; border-radius:6px; border:1px solid var(--border);"></div>
                             </div>
                             <div id="d_prio_lbl">PRIO</div>
                         </div>
@@ -446,17 +439,17 @@ def generar_html_moderno(db_json):
                 <div id="summary_content" style="display:flex; flex-direction:column; justify-content:space-around; flex:1;"></div>
             </div>
             
+            <!-- NUEVO GRÁFICO: HH POR ÁREA MOVIDO AQUÍ -->
+            <div class="chart-card wide">
+                <div class="chart-title">Desglose de Tiempos (HH) por Área</div>
+                <div class="canvas-container"><canvas id="chart_hh_area"></canvas></div>
+            </div>            
+            
             <div class="chart-card wide"><div class="chart-title">Avance por Área</div><div class="canvas-container"><canvas id="chart5"></canvas></div></div>
             
             <div class="chart-card wide"><div class="chart-title">Top Ubicaciones Críticas</div><div class="canvas-container"><canvas id="chart4"></canvas></div></div>
 
             <div class="chart-card wide"><div class="chart-title">Carga Laboral por Responsable</div><div class="canvas-container"><canvas id="chart3"></canvas></div></div>
-            
-            <!-- NUEVO GRÁFICO: HH POR CLASE DE MANTENIMIENTO -->
-            <div class="chart-card wide">
-                <div class="chart-title">Desglose de Tiempos (HH) por Clase de Mantenimiento</div>
-                <div class="canvas-container"><canvas id="chart_hh_clase"></canvas></div>
-            </div>            
         </div>
         
         <div id="view_row" style="display:none; flex:1; flex-direction:column; overflow-y:auto; padding:30px;">
@@ -497,6 +490,23 @@ def generar_html_moderno(db_json):
     Chart.defaults.font.family = "'Segoe UI', system-ui, sans-serif";
     Chart.defaults.color = '#64748b';
 
+    // FUNCIÓN CENTRALIZADA PARA IDENTIFICAR EL ÁREA DEL TÉCNICO
+    const getAreaResp = (ejecutor) => {
+        let ejL = (ejecutor || '').toLowerCase();
+        
+        // Array con todos los nombres o palabras clave para Mecánico
+        let mecanicos = ['luis lagos', 'luis guajardo', 'rubén carrasco', 'ruben carrasco', 
+                         'marcelo rivera', 'vladimir berrios', 'rubén briceño', 'ruben briceño', 
+                         'mantenimiento', 'javier cordova', 'nicolás chandia', 'nicolas chandia'];
+        
+        if (mecanicos.some(nombre => ejL.includes(nombre))) return 'Mecánico';
+        if (ejL.includes('autómata') || ejL.includes('automata')) return 'Autómata';
+        if (ejL.includes('edward corona') || ejL.includes('frio') || ejL.includes('frío')) return 'Frio';
+        if (ejL.includes('infraestructura')) return 'Infraestructura';
+        
+        return 'Otros';
+    };
+
     function togglePlanta() {
         const cb = document.getElementById('planta_toggle');
         const topBar = document.querySelector('.top-bar');
@@ -525,7 +535,7 @@ def generar_html_moderno(db_json):
         };
 
         let html = '';
-        html += createSelect('f_semana', '📆 Semana', weeks, '20'); // SE CAMBIÓ A 20 AQUÍ
+        html += createSelect('f_semana', '📆 Semana', weeks, '20');
         html += createSelect('f_zona', '📍 Zona', [...new Set(records.map(x=>x.zona))].filter(Boolean).sort());
         html += createSelect('f_clase', '🛠️ Clase MTTO', [...new Set(records.map(x=>x.clase))].sort());
         html += createSelect('f_exec', '👷 Responsable', [...new Set(records.map(x=>x.ejecutor))].sort());
@@ -546,7 +556,7 @@ def generar_html_moderno(db_json):
     function resetFilters() {
         if(document.getElementById('search_input')) document.getElementById('search_input').value = '';
         document.querySelectorAll('.f-group select').forEach(sel => sel.value = "ALL");
-        if(document.getElementById('f_semana')) document.getElementById('f_semana').value = "20"; // SE CAMBIÓ A 20 AQUÍ
+        if(document.getElementById('f_semana')) document.getElementById('f_semana').value = "20"; 
         applyFilters();
     }
 
@@ -675,7 +685,6 @@ def generar_html_moderno(db_json):
         else if (d.status === 'en proceso') { stBadge.innerText = '🔨 EN PROCESO'; stBadge.className = 'tag st-proc'; }
         else { stBadge.innerText = '⚠️ PENDIENTE'; stBadge.className = 'tag st-pend'; }
         
-        // --- INFORMACIÓN EXTRA EN LA BARRA SUPERIOR ROJA ---
         let durText = d.duracion ? `<span title="Tiempo de Ejecución (h)">⏱️ Ejecución: ${d.duracion}h</span>` : '';
         let dotText = d.dotacion ? `<span title="Dotación (Cantidad de Personas)">👥 Dotación: ${d.dotacion}</span>` : '';
         let hhText = d.hh > 0 ? `<span title="Duración Total HH">⌛ Total: ${d.hh % 1 === 0 ? d.hh : d.hh.toFixed(1)} HH</span>` : '';
@@ -689,7 +698,6 @@ def generar_html_moderno(db_json):
         } else {
             extraDiv.style.display = 'none';
         }
-        // ---------------------------------------------------
 
         let pl = d.prioridad;
         if(pl==='0') pl='<span class="prio-flag p-crit">🚨 ALTA / CRÍTICA</span>';
@@ -998,19 +1006,10 @@ def generar_html_moderno(db_json):
                 if(isOk) stats.wCounts[d.semana].ok++;
             }
             
-            let ejLower = (d.ejecutor || '').toLowerCase();
-            let area = null;
-            if (ejLower.includes('luis lagos') || ejLower.includes('luis guajardo') || ejLower.includes('rubén carrasco') || ejLower.includes('ruben carrasco') || ejLower.includes('marcelo rivera')) {
-                area = 'Mecánico';
-            } else if (ejLower.includes('autómata') || ejLower.includes('automata')) {
-                area = 'Autómata';
-            } else if (ejLower.includes('edward corona') || ejLower.includes('frio') || ejLower.includes('frío')) {
-                area = 'Frio';
-            } else if (ejLower.includes('infraestructura')) {
-                area = 'Infraestructura';
-            }
+            // Usamos la función centralizada para identificar el área
+            let area = getAreaResp(d.ejecutor);
             
-            if (area) {
+            if (statsArea[area]) {
                 statsArea[area].total++;
                 if (isOk) statsArea[area].ok++;
                 else if (isProc) statsArea[area].proc++;
@@ -1145,54 +1144,87 @@ def generar_html_moderno(db_json):
             }
         });
         
-        const sortedEx = Object.entries(stats.ex).sort((a,b)=>(b[1].ok+b[1].pend+b[1].proc)-(a[1].ok+a[1].pend+a[1].proc)).slice(0,12);
-        new Chart(getFreshCanvas('chart3'), { 
-            type: 'bar', 
-            data: { 
-                labels: sortedEx.map(x=>x[0]), 
-                datasets: [ 
-                    { label:'Pendientes', data:sortedEx.map(x=>x[1].pend), backgroundColor:'#ef4444', borderRadius: 4, barPercentage: 0.7 }, 
-                    { label:'En Proceso', data:sortedEx.map(x=>x[1].proc), backgroundColor:'#f59e0b', borderRadius: 4, barPercentage: 0.7 }, 
-                    { label:'Cerradas', data:sortedEx.map(x=>x[1].ok), backgroundColor:'#10b981', borderRadius: 4, barPercentage: 0.7 } 
+        // ==========================================
+        // NUEVO GRÁFICO: HH POR ÁREA (Mecánico, Autómata, Frio, Infraestructura)
+        // ==========================================
+        let statsAreaHH = {
+            'Mecánico': { ok: 0, proc: 0, pend: 0, sin_hh: 0 },
+            'Autómata': { ok: 0, proc: 0, pend: 0, sin_hh: 0 },
+            'Frio': { ok: 0, proc: 0, pend: 0, sin_hh: 0 },
+            'Infraestructura': { ok: 0, proc: 0, pend: 0, sin_hh: 0 }
+        };
+        
+        data.forEach(d => {
+            let a = getAreaResp(d.ejecutor);
+            
+            // Si el área mapeada es una de las 4 principales, la sumamos.
+            if (statsAreaHH[a]) {
+                let hh = parseFloat(d.hh) || 0;
+                if (hh > 0) {
+                    if (d.status === 'realizada') statsAreaHH[a].ok += hh;
+                    else if (d.status === 'en proceso') statsAreaHH[a].proc += hh;
+                    else statsAreaHH[a].pend += hh; 
+                } else {
+                    statsAreaHH[a].sin_hh += 1; 
+                }
+            }
+        });
+
+        // Ordenamos por cantidad de carga total de horas
+        let labelsAreaHH = Object.keys(statsAreaHH).sort((a, b) => {
+            let totA = statsAreaHH[a].ok + statsAreaHH[a].proc + statsAreaHH[a].pend;
+            let totB = statsAreaHH[b].ok + statsAreaHH[b].proc + statsAreaHH[b].pend;
+            return totB - totA;
+        });
+
+        new Chart(getFreshCanvas('chart_hh_area'), {
+            type: 'bar',
+            data: {
+                labels: labelsAreaHH,
+                datasets: [
+                    { label: 'Pendientes (HH)', data: labelsAreaHH.map(l => statsAreaHH[l].pend), backgroundColor: '#ef4444', borderRadius: 4, barPercentage: 0.7 },
+                    { label: 'En Proceso (HH)', data: labelsAreaHH.map(l => statsAreaHH[l].proc), backgroundColor: '#f59e0b', borderRadius: 4, barPercentage: 0.7 },
+                    { label: 'Cerradas (HH)', data: labelsAreaHH.map(l => statsAreaHH[l].ok), backgroundColor: '#10b981', borderRadius: 4, barPercentage: 0.7 },
+                    { label: 'Sin Tiempo (Cant. OTs)', data: labelsAreaHH.map(l => statsAreaHH[l].sin_hh), backgroundColor: '#94a3b8', borderRadius: 4, barPercentage: 0.7 } 
                 ]
-            }, 
-            options: { 
-                ...chartOpts, 
-                indexAxis: 'y', 
-                scales: { 
-                    x: { stacked: true, grid: { color: '#f1f5f9' }, ticks: { stepSize: 5 } }, 
-                    y: { stacked: true, grid: { display: false } } 
-                }, 
-                plugins: { 
-                    legend: { position: 'top', labels: { usePointStyle: true } }, 
-                    datalabels: { 
-                        display: (ctx) => {
-                            let val = ctx.dataset.data[ctx.dataIndex];
-                            return val > 0;
-                        }, 
-                        color: '#fff', 
-                        font: { weight: 'bold', size: 12 }, 
-                        formatter: (value, ctx) => { 
-                            let sum = 0; 
-                            ctx.chart.data.datasets.forEach(ds => { sum += ds.data[ctx.dataIndex]; }); 
-                            return sum > 0 ? (value * 100 / sum).toFixed(0) + '%' : '0%'; 
-                        } 
-                    } 
-                }, 
-                onClick: (e, els, ch) => { 
-                    if(els.length>0) {
-                        let label = ch.data.labels[els[0].index];
-                        let datasetIndex = els[0].datasetIndex;
-                        let targetStatus = datasetIndex === 2 ? 'realizada' : (datasetIndex === 1 ? 'en proceso' : 'pendiente');
-                        
-                        showDataModal(label, d => {
-                            let isMatch = d.ejecutor === label;
-                            if(targetStatus === 'realizada') return isMatch && d.status === 'realizada';
-                            if(targetStatus === 'en proceso') return isMatch && d.status === 'en proceso';
-                            return isMatch && d.status !== 'realizada' && d.status !== 'en proceso';
-                        }); 
+            },
+            options: {
+                ...chartOpts,
+                indexAxis: 'y',
+                scales: {
+                    x: { stacked: true, grid: { color: '#f1f5f9' } },
+                    y: { stacked: true, grid: { display: false } }
+                },
+                plugins: {
+                    legend: { position: 'top', labels: { usePointStyle: true } },
+                    datalabels: {
+                        display: (ctx) => ctx.dataset.data[ctx.dataIndex] > 0,
+                        color: '#fff',
+                        font: { weight: 'bold', size: 12 },
+                        formatter: (value, ctx) => {
+                            if (ctx.datasetIndex === 3) return value + ' OTs'; 
+                            return (value % 1 === 0 ? value : value.toFixed(1)) + 'h'; 
+                        }
                     }
-                } 
+                },
+                onClick: (e, els, ch) => {
+                    if (els.length > 0) {
+                        let label = ch.data.labels[els[0].index];
+                        let dsIdx = els[0].datasetIndex;
+                        let tituloModal = dsIdx === 3 ? 'Sin Tiempos' : (dsIdx === 2 ? 'Cerradas' : (dsIdx === 1 ? 'En Proceso' : 'Pendientes'));
+                        
+                        showDataModal(`Área: ${label} - ${tituloModal}`, d => {
+                            let isMatch = getAreaResp(d.ejecutor) === label;
+                            if (!isMatch) return false;
+
+                            let hh = parseFloat(d.hh) || 0;
+                            if (dsIdx === 3) return hh === 0; 
+                            if (dsIdx === 2) return d.status === 'realizada' && hh > 0;
+                            if (dsIdx === 1) return d.status === 'en proceso' && hh > 0;
+                            return d.status !== 'realizada' && d.status !== 'en proceso' && hh > 0;
+                        });
+                    }
+                }
             }
         });
 
@@ -1249,13 +1281,60 @@ def generar_html_moderno(db_json):
                             
                             if (!isStMatch) return false;
 
-                            let ejL = (d.ejecutor || '').toLowerCase();
-                            if (label === 'Mecánico') return ejL.includes('luis lagos') || ejL.includes('luis guajardo') || ejL.includes('rubén carrasco') || ejL.includes('ruben carrasco') || ejL.includes('marcelo rivera');
-                            if (label === 'Autómata') return ejL.includes('autómata') || ejL.includes('automata');
-                            if (label === 'Frio') return ejL.includes('edward corona') || ejL.includes('frio') || ejL.includes('frío');
-                            if (label === 'Infraestructura') return ejL.includes('infraestructura');
-                            return false;
+                            // Usamos la función centralizada para el click también
+                            return getAreaResp(d.ejecutor) === label;
                         });
+                    }
+                } 
+            }
+        });
+        
+        const sortedEx = Object.entries(stats.ex).sort((a,b)=>(b[1].ok+b[1].pend+b[1].proc)-(a[1].ok+a[1].pend+a[1].proc)).slice(0,12);
+        new Chart(getFreshCanvas('chart3'), { 
+            type: 'bar', 
+            data: { 
+                labels: sortedEx.map(x=>x[0]), 
+                datasets: [ 
+                    { label:'Pendientes', data:sortedEx.map(x=>x[1].pend), backgroundColor:'#ef4444', borderRadius: 4, barPercentage: 0.7 }, 
+                    { label:'En Proceso', data:sortedEx.map(x=>x[1].proc), backgroundColor:'#f59e0b', borderRadius: 4, barPercentage: 0.7 }, 
+                    { label:'Cerradas', data:sortedEx.map(x=>x[1].ok), backgroundColor:'#10b981', borderRadius: 4, barPercentage: 0.7 } 
+                ]
+            }, 
+            options: { 
+                ...chartOpts, 
+                indexAxis: 'y', 
+                scales: { 
+                    x: { stacked: true, grid: { color: '#f1f5f9' }, ticks: { stepSize: 5 } }, 
+                    y: { stacked: true, grid: { display: false } } 
+                }, 
+                plugins: { 
+                    legend: { position: 'top', labels: { usePointStyle: true } }, 
+                    datalabels: { 
+                        display: (ctx) => {
+                            let val = ctx.dataset.data[ctx.dataIndex];
+                            return val > 0;
+                        }, 
+                        color: '#fff', 
+                        font: { weight: 'bold', size: 12 }, 
+                        formatter: (value, ctx) => { 
+                            let sum = 0; 
+                            ctx.chart.data.datasets.forEach(ds => { sum += ds.data[ctx.dataIndex]; }); 
+                            return sum > 0 ? (value * 100 / sum).toFixed(0) + '%' : '0%'; 
+                        } 
+                    } 
+                }, 
+                onClick: (e, els, ch) => { 
+                    if(els.length>0) {
+                        let label = ch.data.labels[els[0].index];
+                        let datasetIndex = els[0].datasetIndex;
+                        let targetStatus = datasetIndex === 2 ? 'realizada' : (datasetIndex === 1 ? 'en proceso' : 'pendiente');
+                        
+                        showDataModal(label, d => {
+                            let isMatch = d.ejecutor === label;
+                            if(targetStatus === 'realizada') return isMatch && d.status === 'realizada';
+                            if(targetStatus === 'en proceso') return isMatch && d.status === 'en proceso';
+                            return isMatch && d.status !== 'realizada' && d.status !== 'en proceso';
+                        }); 
                     }
                 } 
             }
@@ -1274,85 +1353,6 @@ def generar_html_moderno(db_json):
                     datalabels: {display:false} 
                 }, 
                 onClick: (e, els, ch) => { if(els.length>0) showDataModal(ch.data.labels[els[0].index], d => d.ubicacion === ch.data.labels[els[0].index], 'clase'); } 
-            }
-        });
-
-        // ==========================================
-        // NUEVO GRÁFICO: HH POR CLASE DE MANTENIMIENTO
-        // ==========================================
-        let statsClaseHH = {};
-        
-        data.forEach(d => {
-            let c = d.clase || 'General';
-            if (!statsClaseHH[c]) {
-                statsClaseHH[c] = { ok: 0, proc: 0, pend: 0, sin_hh: 0 };
-            }
-
-            let hh = parseFloat(d.hh) || 0;
-            
-            if (hh > 0) {
-                if (d.status === 'realizada') statsClaseHH[c].ok += hh;
-                else if (d.status === 'en proceso') statsClaseHH[c].proc += hh;
-                else statsClaseHH[c].pend += hh; 
-            } else {
-                statsClaseHH[c].sin_hh += 1; 
-            }
-        });
-
-        let labelsClase = Object.keys(statsClaseHH).sort((a, b) => {
-            let totA = statsClaseHH[a].ok + statsClaseHH[a].proc + statsClaseHH[a].pend;
-            let totB = statsClaseHH[b].ok + statsClaseHH[b].proc + statsClaseHH[b].pend;
-            return totB - totA;
-        });
-
-        new Chart(getFreshCanvas('chart_hh_clase'), {
-            type: 'bar',
-            data: {
-                labels: labelsClase,
-                datasets: [
-                    { label: 'Pendientes (HH)', data: labelsClase.map(l => statsClaseHH[l].pend), backgroundColor: '#ef4444', borderRadius: 4, barPercentage: 0.7 },
-                    { label: 'En Proceso (HH)', data: labelsClase.map(l => statsClaseHH[l].proc), backgroundColor: '#f59e0b', borderRadius: 4, barPercentage: 0.7 },
-                    { label: 'Cerradas (HH)', data: labelsClase.map(l => statsClaseHH[l].ok), backgroundColor: '#10b981', borderRadius: 4, barPercentage: 0.7 },
-                    { label: 'Sin Tiempo (Cant. OTs)', data: labelsClase.map(l => statsClaseHH[l].sin_hh), backgroundColor: '#94a3b8', borderRadius: 4, barPercentage: 0.7 } 
-                ]
-            },
-            options: {
-                ...chartOpts,
-                indexAxis: 'y',
-                scales: {
-                    x: { stacked: true, grid: { color: '#f1f5f9' } },
-                    y: { stacked: true, grid: { display: false } }
-                },
-                plugins: {
-                    legend: { position: 'top', labels: { usePointStyle: true } },
-                    datalabels: {
-                        display: (ctx) => ctx.dataset.data[ctx.dataIndex] > 0,
-                        color: '#fff',
-                        font: { weight: 'bold', size: 12 },
-                        formatter: (value, ctx) => {
-                            if (ctx.datasetIndex === 3) return value + ' OTs'; 
-                            return (value % 1 === 0 ? value : value.toFixed(1)) + 'h'; 
-                        }
-                    }
-                },
-                onClick: (e, els, ch) => {
-                    if (els.length > 0) {
-                        let label = ch.data.labels[els[0].index];
-                        let dsIdx = els[0].datasetIndex;
-                        let tituloModal = dsIdx === 3 ? 'Sin Tiempos' : (dsIdx === 2 ? 'Cerradas' : (dsIdx === 1 ? 'En Proceso' : 'Pendientes'));
-                        
-                        showDataModal(`Clase: ${label} - ${tituloModal}`, d => {
-                            let isMatch = (d.clase || 'General') === label;
-                            if (!isMatch) return false;
-
-                            let hh = parseFloat(d.hh) || 0;
-                            if (dsIdx === 3) return hh === 0; 
-                            if (dsIdx === 2) return d.status === 'realizada' && hh > 0;
-                            if (dsIdx === 1) return d.status === 'en proceso' && hh > 0;
-                            return d.status !== 'realizada' && d.status !== 'en proceso' && hh > 0;
-                        });
-                    }
-                }
             }
         });
     }
@@ -1606,7 +1606,7 @@ def generar_html_moderno(db_json):
     window.onload = () => {
         buildFilters();
         applyFilters();
-        initAntigravity(); // Arranca el efecto
+        initAntigravity();
     };
     </script>
 </body></html>"""
