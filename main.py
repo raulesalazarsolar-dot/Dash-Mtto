@@ -450,7 +450,13 @@ def generar_html_moderno(db_json):
             
             <div class="chart-card wide"><div class="chart-title">Top Ubicaciones Críticas</div><div class="canvas-container"><canvas id="chart4"></canvas></div></div>
 
-            <div class="chart-card wide"><div class="chart-title">Carga Laboral por Responsable</div><div class="canvas-container"><canvas id="chart3"></canvas></div></div>            
+            <div class="chart-card wide"><div class="chart-title">Carga Laboral por Responsable</div><div class="canvas-container"><canvas id="chart3"></canvas></div></div>
+            
+            <!-- NUEVO GRÁFICO: HH POR CLASE DE MANTENIMIENTO -->
+            <div class="chart-card wide">
+                <div class="chart-title">Desglose de Tiempos (HH) por Clase de Mantenimiento</div>
+                <div class="canvas-container"><canvas id="chart_hh_clase"></canvas></div>
+            </div>            
         </div>
         
         <div id="view_row" style="display:none; flex:1; flex-direction:column; overflow-y:auto; padding:30px;">
@@ -1268,6 +1274,85 @@ def generar_html_moderno(db_json):
                     datalabels: {display:false} 
                 }, 
                 onClick: (e, els, ch) => { if(els.length>0) showDataModal(ch.data.labels[els[0].index], d => d.ubicacion === ch.data.labels[els[0].index], 'clase'); } 
+            }
+        });
+
+        // ==========================================
+        // NUEVO GRÁFICO: HH POR CLASE DE MANTENIMIENTO
+        // ==========================================
+        let statsClaseHH = {};
+        
+        data.forEach(d => {
+            let c = d.clase || 'General';
+            if (!statsClaseHH[c]) {
+                statsClaseHH[c] = { ok: 0, proc: 0, pend: 0, sin_hh: 0 };
+            }
+
+            let hh = parseFloat(d.hh) || 0;
+            
+            if (hh > 0) {
+                if (d.status === 'realizada') statsClaseHH[c].ok += hh;
+                else if (d.status === 'en proceso') statsClaseHH[c].proc += hh;
+                else statsClaseHH[c].pend += hh; 
+            } else {
+                statsClaseHH[c].sin_hh += 1; 
+            }
+        });
+
+        let labelsClase = Object.keys(statsClaseHH).sort((a, b) => {
+            let totA = statsClaseHH[a].ok + statsClaseHH[a].proc + statsClaseHH[a].pend;
+            let totB = statsClaseHH[b].ok + statsClaseHH[b].proc + statsClaseHH[b].pend;
+            return totB - totA;
+        });
+
+        new Chart(getFreshCanvas('chart_hh_clase'), {
+            type: 'bar',
+            data: {
+                labels: labelsClase,
+                datasets: [
+                    { label: 'Pendientes (HH)', data: labelsClase.map(l => statsClaseHH[l].pend), backgroundColor: '#ef4444', borderRadius: 4, barPercentage: 0.7 },
+                    { label: 'En Proceso (HH)', data: labelsClase.map(l => statsClaseHH[l].proc), backgroundColor: '#f59e0b', borderRadius: 4, barPercentage: 0.7 },
+                    { label: 'Cerradas (HH)', data: labelsClase.map(l => statsClaseHH[l].ok), backgroundColor: '#10b981', borderRadius: 4, barPercentage: 0.7 },
+                    { label: 'Sin Tiempo (Cant. OTs)', data: labelsClase.map(l => statsClaseHH[l].sin_hh), backgroundColor: '#94a3b8', borderRadius: 4, barPercentage: 0.7 } 
+                ]
+            },
+            options: {
+                ...chartOpts,
+                indexAxis: 'y',
+                scales: {
+                    x: { stacked: true, grid: { color: '#f1f5f9' } },
+                    y: { stacked: true, grid: { display: false } }
+                },
+                plugins: {
+                    legend: { position: 'top', labels: { usePointStyle: true } },
+                    datalabels: {
+                        display: (ctx) => ctx.dataset.data[ctx.dataIndex] > 0,
+                        color: '#fff',
+                        font: { weight: 'bold', size: 12 },
+                        formatter: (value, ctx) => {
+                            if (ctx.datasetIndex === 3) return value + ' OTs'; 
+                            return (value % 1 === 0 ? value : value.toFixed(1)) + 'h'; 
+                        }
+                    }
+                },
+                onClick: (e, els, ch) => {
+                    if (els.length > 0) {
+                        let label = ch.data.labels[els[0].index];
+                        let dsIdx = els[0].datasetIndex;
+                        let tituloModal = dsIdx === 3 ? 'Sin Tiempos' : (dsIdx === 2 ? 'Cerradas' : (dsIdx === 1 ? 'En Proceso' : 'Pendientes'));
+                        
+                        showDataModal(`Clase: ${label} - ${tituloModal}`, d => {
+                            let isMatch = (d.clase || 'General') === label;
+                            if (!isMatch) return false;
+
+                            let hh = parseFloat(d.hh) || 0;
+                            if (dsIdx === 3) return hh === 0; 
+                            if (dsIdx === 2) return d.status === 'realizada' && hh > 0;
+                            if (dsIdx === 1) return d.status === 'en proceso' && hh > 0;
+                            return d.status !== 'realizada' && d.status !== 'en proceso' && hh > 0;
+                        });
+                    }
+                }
             }
         });
     }
