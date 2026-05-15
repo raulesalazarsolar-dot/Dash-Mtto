@@ -98,13 +98,14 @@ def main():
         
         print("   ⏳ Solicitando registros y adjuntos...")
         
+        # AGREGADAS LAS NUEVAS COLUMNAS CON LOS NOMBRES INTERNOS EXACTOS
         columnas_req = [
             "Id", "Title", "LinkTitle", "field_2", "field_3", "field_4", 
             "field_5", "field_6", "field_7", "Responsable", "field_10", 
             "field_11", "field_14", "field_15", "Antes", "Despues", 
             "field_1", "ClaseM", "Zona", "Planta", "Attachments", "AttachmentFiles", "HH", 
             "Duraci_x00f3_n_x0028_HR_x0029_", "CantidadPersonas",
-            "Dia", "Tecnico", "Tecnico2", "Tecnico3", "CRITICIDAD", "Colaborador"
+            "Dia", "Tecnico", "Tecnico2", "Tecnico3", "CRITICIDAD"
         ]
         
         try:
@@ -122,10 +123,13 @@ def main():
             p = item.properties
             
             semana_val = limpiar(p.get("field_1"))
+            # FILTRO ESTRICTO: Solo dejar semanas 19 y 20
             if semana_val not in ["19", "20"]:
                 continue
 
             item_id = int(p.get("Id", 0))
+
+            # ASIGNACIÓN DE PLANTA
             planta_raw = limpiar(p.get("Planta")).lower()
             planta_final = "carne" if "carne" in planta_raw else "masas"
 
@@ -139,14 +143,18 @@ def main():
             elif any(k in status_txt for k in ['proceso', 'tratando', 'curso']): status = "en proceso"
             else: status = "pendiente"
 
+            prio_raw = normalizar_texto(limpiar(p.get("field_10"))) 
+            if "calavera" in prio_raw or "0" in prio_raw: prio = "0"
+            elif "alta" in prio_raw or "1" in prio_raw: prio = "1"
+            elif "media" in prio_raw or "2" in prio_raw: prio = "2"
+            else: prio = "3"
+
+            # EXTRACCIÓN COLUMNA CRITICIDAD REAL (Corregido a CRITICIDAD en mayúsculas)
             crit_raw = normalizar_texto(limpiar(p.get("CRITICIDAD")))
             if "crit" in crit_raw: crit_final = "Critica"
             elif "mayor" in crit_raw: crit_final = "Mayor"
             elif "menor" in crit_raw: crit_final = "Menor"
             else: crit_final = "Sin Asignar"
-
-            # EXTRACCIÓN COLABORADOR (INTERNO / EXTERNO)
-            colab_raw = limpiar(p.get("Colaborador")).strip().title()
 
             clase_str = limpiar(p.get("ClaseM")).title()
             clase_final = clase_str if clase_str and clase_str.lower() != "none" else "General"
@@ -173,7 +181,6 @@ def main():
                 "planta": planta_final,
                 "ejecutor": limpiar(p.get("Responsable")) or "Sin Asignar",
                 "criticidad": crit_final,
-                "colaborador": colab_raw or "Interno", # Defecto a Interno si está vacío
                 "ubicacion": limpiar(p.get("field_5")),
                 "sub_ubi": limpiar(p.get("field_6")),
                 "ot": limpiar(p.get("field_7")),
@@ -242,13 +249,16 @@ def generar_html_moderno(db_json):
         .app-layout { display: flex; height: calc(100vh - 110px); width: 100%; overflow: hidden; }
         
         .col-filters { width: 280px; background: #fff; border-right: 1px solid var(--border); display: flex; flex-direction: column; flex-shrink: 0; z-index: 5; }
+        
         .filters-header { padding: 15px 20px; border-bottom: 1px solid var(--border); font-weight: 700; color: var(--primary); font-size: 0.9rem; text-transform: uppercase; background: #f8fafc; display: flex; justify-content: space-between; align-items: center; }
+        
         .filters-body { flex: 1; overflow-y: auto; padding: 20px; min-height: 0; } 
         .filters-footer { padding: 20px; border-top: 1px solid var(--border); background: #f8fafc; flex-shrink: 0; }
         
         .f-group { margin-bottom: 15px; }
         .f-group label { font-size: 0.75rem; font-weight: 700; color: var(--muted); display: block; margin-bottom: 6px; text-transform: uppercase; }
         select, input[type="text"] { width: 100%; padding: 10px; border: 1px solid var(--border); border-radius: 6px; font-size: 0.85rem; color: var(--text); }
+        select:focus, input[type="text"]:focus { border-color: var(--accent); box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.1); }
         
         .btn-clean { background: white; border: 1px solid var(--danger); color: var(--danger); padding: 10px; border-radius: 6px; cursor: pointer; font-weight: 700; transition: 0.2s; width: 100%; text-transform: uppercase; font-size: 0.8rem; letter-spacing: 0.5px; }
         .btn-clean:hover { background: var(--danger); color: white; }
@@ -289,10 +299,12 @@ def generar_html_moderno(db_json):
         .obs-box p { background: #f8fafc; padding: 20px; border-radius: 8px; border: 1px solid var(--border); margin: 0; line-height: 1.6; color: #334155; }
         
         .gallery-section { padding: 30px; background: #f8fafc; display:flex; flex-direction: column; align-items: center; gap: 15px; }
+        .gallery-section h4 { margin:0; color:var(--secondary); font-size:0.9rem; text-transform:uppercase; align-self: flex-start; }
         .gallery-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; width: 100%; }
         .gal-box { background: white; border: 1px solid var(--border); border-radius: 8px; padding: 15px; display: flex; flex-direction: column; align-items: center; gap: 10px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
         .gal-box span { font-weight: 700; font-size: 0.85rem; color: var(--secondary); text-transform: uppercase; padding-bottom: 5px; border-bottom: 2px solid var(--accent); margin-bottom: 5px; }
         .gal-img { max-width: 100%; max-height: 350px; border-radius: 6px; cursor: zoom-in; box-shadow: 0 2px 5px rgba(0,0,0,0.1); transition: transform 0.2s; object-fit: contain; }
+        .gal-img:hover { transform: scale(1.02); }
         
         .graficos-layout { flex: 1; padding: 30px; display: grid; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); grid-auto-rows: min-content; gap: 25px; overflow-y: auto; align-content: start; }
         .chart-card { background: white; padding: 25px; border-radius: 12px; border: 1px solid var(--border); box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); display: flex; flex-direction: column; height: 400px; width: 100%; }
@@ -312,6 +324,7 @@ def generar_html_moderno(db_json):
         .dm-header { padding: 20px 25px; background: var(--primary); color: white; display: flex; justify-content: space-between; align-items: center; }
         .dm-header h3 { margin: 0; font-size: 1.2rem; font-weight: 600; }
         .dm-close { background: none; border: none; color: white; font-size: 1.8rem; cursor: pointer; opacity: 0.8; transition: 0.2s; line-height: 1; }
+        .dm-close:hover { opacity: 1; transform: scale(1.1); }
         .dm-body { padding: 0; overflow-y: auto; flex: 1; background: var(--bg); }
         .dm-table { width: 100%; border-collapse: collapse; background: white; font-size: 0.9rem; text-align: left; }
         
@@ -554,13 +567,6 @@ def generar_html_moderno(db_json):
         
         html += createSelect('f_especialidad', '🧑‍🔧 Especialidad', ['Mecánico', 'Autómata', 'Frio', 'Infraestructura', 'Otros'].sort());
         
-        // --- NUEVO: FILTRO COLABORADOR ---
-        html += `<div class="f-group"><label>👥 Colaborador</label><select id="f_colaborador" onchange="applyFilters()">
-            <option value="ALL">Todos</option>
-            <option value="Interno">Interno</option>
-            <option value="Externo">Externo</option>
-        </select></div>`;
-
         html += createSelect('f_exec', '👷 Responsable', [...new Set(records.map(x=>x.ejecutor))].sort());
         html += createSelect('f_ubi', '🏭 Línea / Área', [...new Set(records.map(x=>x.ubicacion))].sort());
         
@@ -624,10 +630,8 @@ def generar_html_moderno(db_json):
         const semVal = document.getElementById('f_semana') ? document.getElementById('f_semana').value : 'ALL';
         const zVal = document.getElementById('f_zona') ? document.getElementById('f_zona').value : 'ALL';
         const espVal = document.getElementById('f_especialidad') ? document.getElementById('f_especialidad').value : 'ALL';
-        const critVal = document.getElementById('f_criticidad') ? document.getElementById('f_criticidad').value : 'ALL';
         
-        // LEER EL NUEVO FILTRO
-        const colabVal = document.getElementById('f_colaborador') ? document.getElementById('f_colaborador').value : 'ALL';
+        const critVal = document.getElementById('f_criticidad') ? document.getElementById('f_criticidad').value : 'ALL';
         
         const searchVal = document.getElementById('search_input') ? document.getElementById('search_input').value.toLowerCase().trim() : '';
 
@@ -653,11 +657,10 @@ def generar_html_moderno(db_json):
             if (uVal !== 'ALL' && d.ubicacion !== uVal) return false;
             if (semVal !== 'ALL' && d.semana !== semVal) return false;
             if (zVal !== 'ALL' && d.zona !== zVal) return false;
+            
             if (espVal !== 'ALL' && getAreaResp(d.ejecutor) !== espVal) return false;
+            
             if (critVal !== 'ALL' && d.criticidad !== critVal) return false;
-
-            // FILTRADO POR COLABORADOR
-            if (colabVal !== 'ALL' && d.colaborador !== colabVal) return false;
             
             return true;
         });
@@ -767,7 +770,6 @@ def generar_html_moderno(db_json):
         grid.innerHTML += createItem('📆 Semana', d.semana);
         grid.innerHTML += createItem('🧾 OT SAP', d.ot);
         grid.innerHTML += createItem('⚠️ Criticidad', d.criticidad);
-        grid.innerHTML += createItem('👥 Colaborador', d.colaborador);
         
         if (d.dia) grid.innerHTML += createItem('📅 Día Asignado', d.dia);
         let techsList = [d.tecnico, d.tecnico1, d.tecnico2].filter(t => t && t !== 'ALL').join(', ');
@@ -952,7 +954,6 @@ def generar_html_moderno(db_json):
             "Sub Ubicación": d.sub_ubi,
             "OT": d.ot,
             "Criticidad": d.criticidad,
-            "Colaborador": d.colaborador,
             "Ejecutor": d.ejecutor,
             "Status": d.status.toUpperCase(),
             "Observación": d.observacion,
@@ -972,8 +973,8 @@ def generar_html_moderno(db_json):
 
         const anchos = [
             { wch: 12 }, { wch: 12 }, { wch: 40 }, { wch: 15 }, { wch: 15 }, { wch: 15 }, { wch: 20 }, 
-            { wch: 20 }, { wch: 15 }, { wch: 15 }, { wch: 15 }, { wch: 20 }, { wch: 15 }, { wch: 50 }, 
-            { wch: 10 }, { wch: 15 }, { wch: 10 }, { wch: 15 }, { wch: 15 }, { wch: 15 }, { wch: 15 }
+            { wch: 20 }, { wch: 15 }, { wch: 15 }, { wch: 20 }, { wch: 15 }, { wch: 50 }, { wch: 10 }, 
+            { wch: 15 }, { wch: 10 }, { wch: 15 }, { wch: 15 }, { wch: 15 }, { wch: 15 }, { wch: 15 }
         ];
         worksheet['!cols'] = anchos;
 
@@ -1119,94 +1120,688 @@ def generar_html_moderno(db_json):
         `;
         document.getElementById('summary_content').innerHTML = summaryHtml;
 
-        const chartOpts = { maintainAspectRatio:false, responsive:true, animation: { duration: 1200, easing: 'easeOutQuart' }, layout: { padding: 10 } };
+        const chartOpts = { 
+            maintainAspectRatio:false, 
+            responsive:true, 
+            animation: { duration: 1200, easing: 'easeOutQuart' },
+            layout: { padding: 10 }
+        };
         const gridHideY = { x: { grid: { color: '#f1f5f9' } }, y: { grid: { display: false } } };
 
         new Chart(getFreshCanvas('chart1'), { 
             type: 'doughnut', 
             data: { 
                 labels:['Cerradas', 'En Proceso', 'Pendientes', 'Programadas'], 
-                datasets:[{ data:[stats.ok, stats.proc, stats.pend, stats.prog], backgroundColor:['#10b981', '#f59e0b', '#ef4444', '#3b82f6'], borderWidth: 2, borderColor: '#fff', hoverOffset: 5 }] 
+                datasets:[{ 
+                    data:[stats.ok, stats.proc, stats.pend, stats.prog], 
+                    backgroundColor:['#10b981', '#f59e0b', '#ef4444', '#3b82f6'], 
+                    borderWidth: 2, borderColor: '#fff', hoverOffset: 5 
+                }] 
             }, 
-            options: { ...chartOpts, cutout: '65%', plugins: { legend: { position: 'bottom', labels: { padding: 20, usePointStyle: true } }, datalabels: { display: (ctx) => { let val = ctx.dataset.data[ctx.dataIndex]; if(val === 0) return false; let sum = ctx.chart.data.datasets[0].data.reduce((a, b) => a + b, 0); return (val * 100 / sum) > 4; }, color: '#fff', font: { weight: 'bold', size: 14 }, formatter: (value, ctx) => { let sum = ctx.chart.data.datasets[0].data.reduce((a, b) => a + b, 0); return (value * 100 / sum).toFixed(0) + '%'; } } } }
+            options: { 
+                ...chartOpts, 
+                cutout: '65%', 
+                plugins: { 
+                    legend: { position: 'bottom', labels: { padding: 20, usePointStyle: true } }, 
+                    datalabels: { 
+                        display: (ctx) => { 
+                            let val = ctx.dataset.data[ctx.dataIndex]; 
+                            if(val === 0) return false; 
+                            let sum = ctx.chart.data.datasets[0].data.reduce((a, b) => a + b, 0); 
+                            return (val * 100 / sum) > 4;
+                        }, 
+                        color: '#fff', 
+                        font: { weight: 'bold', size: 14 }, 
+                        formatter: (value, ctx) => { 
+                            let sum = ctx.chart.data.datasets[0].data.reduce((a, b) => a + b, 0); 
+                            return (value * 100 / sum).toFixed(0) + '%'; 
+                        } 
+                    } 
+                }, 
+                onClick: (e, els, ch) => { 
+                    if(els.length>0) showDataModal(ch.data.labels[els[0].index], d => { 
+                        let st = ch.data.labels[els[0].index]; 
+                        if(st==='Cerradas') return d.status==='realizada'; 
+                        if(st==='En Proceso') return d.status==='en proceso'; 
+                        if(st==='Programadas') return d.status==='programado'; 
+                        return d.status==='pendiente'; 
+                    }); 
+                } 
+            }
         });
         
         let cLabels = Object.keys(stats.cCounts);
         let baseColors = ['#3b82f6','#8b5cf6','#ec4899','#14b8a6','#f97316', '#6366f1', '#10b981'];
+        let cBgColors = cLabels.map((lbl, idx) => {
+            let l = lbl.toLowerCase();
+            if(l.includes('aseo') || l.includes('limpieza') || l.includes('sanitizacion y seguridad') || l.includes('sanitización y seguridad')) return '#eab308';
+            return baseColors[idx % baseColors.length];
+        });
+
         new Chart(getFreshCanvas('chart2'), { 
             type: 'pie', 
-            data: { labels: cLabels, datasets:[{ data:Object.values(stats.cCounts), backgroundColor: cLabels.map((l,i)=>l.toLowerCase().includes('aseo')?'#eab308':baseColors[i%baseColors.length]), borderWidth: 2, borderColor: '#fff', hoverOffset: 5 }] }, 
-            options: { ...chartOpts, plugins: { legend: { position: 'right', labels: { padding: 15, usePointStyle: true } }, datalabels: { display: (ctx) => { let val = ctx.dataset.data[ctx.dataIndex]; if(val === 0) return false; let sum = ctx.chart.data.datasets[0].data.reduce((a, b) => a + b, 0); return (val * 100 / sum) > 4; }, color: '#fff', font: { weight: 'bold', size: 14 }, formatter: (value, ctx) => { let sum = ctx.chart.data.datasets[0].data.reduce((a, b) => a + b, 0); return (value * 100 / sum).toFixed(0) + '%'; } } } }
+            data: { labels: cLabels, datasets:[{ data:Object.values(stats.cCounts), backgroundColor: cBgColors, borderWidth: 2, borderColor: '#fff', hoverOffset: 5 }] }, 
+            options: { 
+                ...chartOpts, 
+                plugins: { 
+                    legend: { position: 'right', labels: { padding: 15, usePointStyle: true } }, 
+                    datalabels: { 
+                        display: (ctx) => { 
+                            let val = ctx.dataset.data[ctx.dataIndex]; 
+                            if(val === 0) return false; 
+                            let sum = ctx.chart.data.datasets[0].data.reduce((a, b) => a + b, 0); 
+                            return (val * 100 / sum) > 4;
+                        }, 
+                        color: '#fff', 
+                        font: { weight: 'bold', size: 14 }, 
+                        formatter: (value, ctx) => { 
+                            let sum = ctx.chart.data.datasets[0].data.reduce((a, b) => a + b, 0); 
+                            return (value * 100 / sum).toFixed(0) + '%'; 
+                        } 
+                    } 
+                }, 
+                onClick: (e, els, ch) => { if(els.length>0) showDataModal(ch.data.labels[els[0].index], d => d.clase === ch.data.labels[els[0].index]); } 
+            }
         });
         
-        let labelsAreaHH = Object.keys(statsArea).sort();
+        let statsAreaHH = {
+            'Mecánico': { ok: 0, proc: 0, pend: 0, sin_hh: 0 },
+            'Autómata': { ok: 0, proc: 0, pend: 0, sin_hh: 0 },
+            'Frio': { ok: 0, proc: 0, pend: 0, sin_hh: 0 },
+            'Infraestructura': { ok: 0, proc: 0, pend: 0, sin_hh: 0 }
+        };
+        
+        data.forEach(d => {
+            let a = getAreaResp(d.ejecutor);
+            if (statsAreaHH[a]) {
+                let hh = parseFloat(d.hh) || 0;
+                if (hh > 0) {
+                    if (d.status === 'realizada') statsAreaHH[a].ok += hh;
+                    else if (d.status === 'en proceso') statsAreaHH[a].proc += hh;
+                    else statsAreaHH[a].pend += hh; 
+                } else {
+                    statsAreaHH[a].sin_hh += 1; 
+                }
+            }
+        });
+
+        let labelsAreaHH = Object.keys(statsAreaHH).sort((a, b) => {
+            let totA = statsAreaHH[a].ok + statsAreaHH[a].proc + statsAreaHH[a].pend;
+            let totB = statsAreaHH[b].ok + statsAreaHH[b].proc + statsAreaHH[b].pend;
+            return totB - totA;
+        });
+
         new Chart(getFreshCanvas('chart_hh_area'), {
             type: 'bar',
             data: {
                 labels: labelsAreaHH,
                 datasets: [
-                    { label: 'Pendientes (HH)', data: labelsAreaHH.map(l => 0), backgroundColor: '#ef4444', borderRadius: 4, barPercentage: 0.7 }, // Simplificado para brevedad
-                    { label: 'Cerradas (HH)', data: labelsAreaHH.map(l => 0), backgroundColor: '#10b981', borderRadius: 4, barPercentage: 0.7 }
+                    { label: 'Pendientes (HH)', data: labelsAreaHH.map(l => statsAreaHH[l].pend), backgroundColor: '#ef4444', borderRadius: 4, barPercentage: 0.7 },
+                    { label: 'En Proceso (HH)', data: labelsAreaHH.map(l => statsAreaHH[l].proc), backgroundColor: '#f59e0b', borderRadius: 4, barPercentage: 0.7 },
+                    { label: 'Cerradas (HH)', data: labelsAreaHH.map(l => statsAreaHH[l].ok), backgroundColor: '#10b981', borderRadius: 4, barPercentage: 0.7 },
+                    { label: 'Sin Tiempo (Cant. OTs)', data: labelsAreaHH.map(l => statsAreaHH[l].sin_hh), backgroundColor: '#94a3b8', borderRadius: 4, barPercentage: 0.7 } 
                 ]
             },
-            options: { ...chartOpts, indexAxis: 'y', scales: { x: { stacked: true }, y: { stacked: true } } }
+            options: {
+                ...chartOpts,
+                indexAxis: 'y',
+                scales: {
+                    x: { stacked: true, grid: { color: '#f1f5f9' } },
+                    y: { stacked: true, grid: { display: false } }
+                },
+                plugins: {
+                    legend: { position: 'top', labels: { usePointStyle: true } },
+                    datalabels: {
+                        display: (ctx) => ctx.dataset.data[ctx.dataIndex] > 0,
+                        color: '#fff',
+                        font: { weight: 'bold', size: 12 },
+                        formatter: (value, ctx) => {
+                            if (ctx.datasetIndex === 3) return value + ' OTs'; 
+                            return (value % 1 === 0 ? value : value.toFixed(1)) + 'h'; 
+                        }
+                    }
+                },
+                onClick: (e, els, ch) => {
+                    if (els.length > 0) {
+                        let label = ch.data.labels[els[0].index];
+                        let dsIdx = els[0].datasetIndex;
+                        let tituloModal = dsIdx === 3 ? 'Sin Tiempos' : (dsIdx === 2 ? 'Cerradas' : (dsIdx === 1 ? 'En Proceso' : 'Pendientes'));
+                        
+                        showDataModal(`Área: ${label} - ${tituloModal}`, d => {
+                            let isMatch = getAreaResp(d.ejecutor) === label;
+                            if (!isMatch) return false;
+
+                            let hh = parseFloat(d.hh) || 0;
+                            if (dsIdx === 3) return hh === 0; 
+                            if (dsIdx === 2) return d.status === 'realizada' && hh > 0;
+                            if (dsIdx === 1) return d.status === 'en proceso' && hh > 0;
+                            return d.status !== 'realizada' && d.status !== 'en proceso' && hh > 0;
+                        });
+                    }
+                }
+            }
         });
+
+        const areaLabels = ['Mecánico', 'Autómata', 'Frio', 'Infraestructura'];
+        const areaPendData = areaLabels.map(l => statsArea[l].pend);
+        const areaProcData = areaLabels.map(l => statsArea[l].proc);
+        const areaOkData = areaLabels.map(l => statsArea[l].ok);
 
         new Chart(getFreshCanvas('chart5'), {
             type: 'bar',
-            data: { labels: ['Mecánico', 'Autómata', 'Frio', 'Infraestructura'], datasets: [ { label: 'Cerradas', data: [0,0,0,0], backgroundColor: '#10b981' } ] },
-            options: { ...chartOpts, indexAxis: 'y', scales: { x: { stacked: true } } }
+            data: { 
+                labels: areaLabels, 
+                datasets: [ 
+                    { label: 'Pendientes', data: areaPendData, backgroundColor: '#ef4444', borderRadius: 4, barPercentage: 0.7 },
+                    { label: 'En Proceso', data: areaProcData, backgroundColor: '#f59e0b', borderRadius: 4, barPercentage: 0.7 },
+                    { label: 'Cerradas', data: areaOkData, backgroundColor: '#10b981', borderRadius: 4, barPercentage: 0.7 }
+                ] 
+            },
+            options: { 
+                ...chartOpts, 
+                indexAxis: 'y', 
+                scales: { 
+                    x: { stacked: true, grid: { color: '#f1f5f9' }, ticks: { stepSize: 5 } }, 
+                    y: { stacked: true, grid: { display: false } } 
+                }, 
+                plugins: { 
+                    legend: { position: 'top', labels: { usePointStyle: true } }, 
+                    datalabels: { 
+                        display: (ctx) => {
+                            let val = ctx.dataset.data[ctx.dataIndex];
+                            return val > 0; 
+                        }, 
+                        color: '#fff', 
+                        font: { weight: 'bold', size: 12 }, 
+                        formatter: (value, ctx) => { 
+                            let sum = 0; 
+                            ctx.chart.data.datasets.forEach(ds => { sum += ds.data[ctx.dataIndex]; }); 
+                            return sum > 0 ? (value * 100 / sum).toFixed(0) + '%' : '0%'; 
+                        } 
+                    } 
+                }, 
+                onClick: (e, els, ch) => { 
+                    if(els.length > 0) {
+                        let label = ch.data.labels[els[0].index];
+                        let datasetIndex = els[0].datasetIndex;
+                        let targetStatus = datasetIndex === 2 ? 'realizada' : (datasetIndex === 1 ? 'en proceso' : 'pendiente');
+                        let titleStatus = datasetIndex === 2 ? 'Cerradas' : (datasetIndex === 1 ? 'En Proceso' : 'Pendientes');
+
+                        showDataModal('Avance ' + label + ' - ' + titleStatus, d => {
+                            let isStMatch = false;
+                            if (targetStatus === 'realizada') isStMatch = (d.status === 'realizada');
+                            else if (targetStatus === 'en proceso') isStMatch = (d.status === 'en proceso');
+                            else isStMatch = (d.status !== 'realizada' && d.status !== 'en proceso');
+                            
+                            if (!isStMatch) return false;
+                            return getAreaResp(d.ejecutor) === label;
+                        });
+                    }
+                } 
+            }
+        });
+        
+        const sortedEx = Object.entries(stats.ex).sort((a,b)=>(b[1].ok+b[1].pend+b[1].proc)-(a[1].ok+a[1].pend+a[1].proc)).slice(0,12);
+        new Chart(getFreshCanvas('chart3'), { 
+            type: 'bar', 
+            data: { 
+                labels: sortedEx.map(x=>x[0]), 
+                datasets: [ 
+                    { label:'Pendientes', data:sortedEx.map(x=>x[1].pend), backgroundColor:'#ef4444', borderRadius: 4, barPercentage: 0.7 }, 
+                    { label:'En Proceso', data:sortedEx.map(x=>x[1].proc), backgroundColor:'#f59e0b', borderRadius: 4, barPercentage: 0.7 }, 
+                    { label:'Cerradas', data:sortedEx.map(x=>x[1].ok), backgroundColor:'#10b981', borderRadius: 4, barPercentage: 0.7 } 
+                ]
+            }, 
+            options: { 
+                ...chartOpts, 
+                indexAxis: 'y', 
+                scales: { 
+                    x: { stacked: true, grid: { color: '#f1f5f9' }, ticks: { stepSize: 5 } }, 
+                    y: { stacked: true, grid: { display: false } } 
+                }, 
+                plugins: { 
+                    legend: { position: 'top', labels: { usePointStyle: true } }, 
+                    datalabels: { 
+                        display: (ctx) => {
+                            let val = ctx.dataset.data[ctx.dataIndex];
+                            return val > 0;
+                        }, 
+                        color: '#fff', 
+                        font: { weight: 'bold', size: 12 }, 
+                        formatter: (value, ctx) => { 
+                            let sum = 0; 
+                            ctx.chart.data.datasets.forEach(ds => { sum += ds.data[ctx.dataIndex]; }); 
+                            return sum > 0 ? (value * 100 / sum).toFixed(0) + '%' : '0%'; 
+                        } 
+                    } 
+                }, 
+                onClick: (e, els, ch) => { 
+                    if(els.length>0) {
+                        let label = ch.data.labels[els[0].index];
+                        let datasetIndex = els[0].datasetIndex;
+                        let targetStatus = datasetIndex === 2 ? 'realizada' : (datasetIndex === 1 ? 'en proceso' : 'pendiente');
+                        
+                        showDataModal(label, d => {
+                            let isMatch = d.ejecutor === label;
+                            if(targetStatus === 'realizada') return isMatch && d.status === 'realizada';
+                            if(targetStatus === 'en proceso') return isMatch && d.status === 'en proceso';
+                            return isMatch && d.status !== 'realizada' && d.status !== 'en proceso';
+                        }); 
+                    }
+                } 
+            }
+        });
+
+        const sortedLocs = Object.entries(stats.loc).sort((a,b)=>b[1]-a[1]).slice(0,12);
+        new Chart(getFreshCanvas('chart4'), {
+            type: 'bar',
+            data: { labels: sortedLocs.map(x=>x[0]), datasets: [ { label: 'Total Hallazgos', data: sortedLocs.map(x=>x[1]), backgroundColor:'#8b5cf6', borderRadius: 6, barPercentage: 0.6 } ]},
+            options: { 
+                ...chartOpts, 
+                indexAxis: 'y', 
+                scales: gridHideY, 
+                plugins: { 
+                    legend: { display: false }, 
+                    datalabels: {display:false} 
+                }, 
+                onClick: (e, els, ch) => { if(els.length>0) showDataModal(ch.data.labels[els[0].index], d => d.ubicacion === ch.data.labels[els[0].index], 'clase'); } 
+            }
         });
     }
 
     function drawRowCharts(data) {
         if(!data) return;
-        const commonOptsRow = { maintainAspectRatio: false, responsive: true, plugins: { legend: { position: 'top' }, datalabels: { display: true, color: '#fff', formatter: (val) => val + '%' } } };
-        new Chart(getFreshCanvas('row_chart1'), { type: 'pie', data: { labels: ['MTTO', 'Aseo'], datasets: [{ data: [50, 50], backgroundColor: ['#3b82f6', '#eab308'] }] }, options: commonOptsRow });
+
+        const semVal = document.getElementById('f_semana') ? document.getElementById('f_semana').value : 'ALL';
+        document.getElementById('row_week_title').innerText = semVal === "ALL" ? "Semanas: " + weeks.join(' y ') : "Semana " + semVal;
+        
+        let stats = {
+            mtto: { total: 0, ok: 0 },
+            aseo: { total: 0, ok: 0 },
+            panaderia: {
+                'L1': { mtto: {tot:0, ok:0} },
+                'L2': { mtto: {tot:0, ok:0} },
+                'L3': { mtto: {tot:0, ok:0} },
+                'L4': { mtto: {tot:0, ok:0} },
+                'L5': { mtto: {tot:0, ok:0} }
+            },
+            dely: {
+                'Pizza': { mtto: {tot:0, ok:0} },
+                'Bolleria': { mtto: {tot:0, ok:0} },
+                'Empanadas': { mtto: {tot:0, ok:0} }
+            }
+        };
+        
+        data.forEach(d => {
+            let isOk = (d.status === 'realizada');
+            let isAseo = isAseoAct(d);
+            let isMtto = !isAseo; 
+            
+            if (isAseo) { stats.aseo.total++; if(isOk) stats.aseo.ok++; }
+            if (isMtto) { stats.mtto.total++; if(isOk) stats.mtto.ok++; }
+            
+            let pLoc = getPLoc(d);
+            if (pLoc && isMtto) { stats.panaderia[pLoc].mtto.tot++; if(isOk) stats.panaderia[pLoc].mtto.ok++; }
+            
+            let dLoc = getDLoc(d);
+            if (dLoc && isMtto) { stats.dely[dLoc].mtto.tot++; if(isOk) stats.dely[dLoc].mtto.ok++; }
+        });
+
+        const getPerc = (ok, tot) => tot > 0 ? Math.round((ok/tot)*100) : 0;
+        
+        const chartIds = ['row_chart1', 'row_chart2', 'row_chart3', 'row_chart4', 'row_chart5'];
+        chartIds.forEach(id => {
+            if (chartInstances[id]) { chartInstances[id].destroy(); chartInstances[id] = null; }
+        });
+
+        const commonOptsRow = { 
+            maintainAspectRatio: false, responsive: true, animation: { duration: 1000 },
+            plugins: { 
+                legend: { position: 'top', labels: { usePointStyle: true } },
+                datalabels: { 
+                    display: (ctx) => ctx.dataset.data[ctx.dataIndex] > 0, 
+                    color: '#fff', font: { weight: 'bold', size: 13 },
+                    formatter: (val) => val + '%'
+                }
+            }
+        };
+
+        let totalAct = stats.mtto.total + stats.aseo.total;
+        let pMttoTot = getPerc(stats.mtto.total, totalAct);
+        let pAseoTot = getPerc(stats.aseo.total, totalAct);
+        
+        chartInstances['row_chart1'] = new Chart(getFreshCanvas('row_chart1'), {
+            type: 'pie',
+            data: { labels: ['Mantenimiento', 'Aseo / Sanit. y Seg.'], datasets: [{ data: [pMttoTot, pAseoTot], backgroundColor: ['#3b82f6', '#eab308'], borderWidth: 2, borderColor: '#fff' }] },
+            options: { 
+                ...commonOptsRow, 
+                plugins: { ...commonOptsRow.plugins, legend: { position: 'bottom', labels: { usePointStyle: true } } },
+                onClick: (e, els, ch) => { 
+                    if(els.length>0) {
+                        let label = ch.data.labels[els[0].index];
+                        showDataModal(label, d => label === 'Aseo / Sanit. y Seg.' ? isAseoAct(d) : !isAseoAct(d));
+                    }
+                }
+            }
+        });
+
+        let pMttoCump = getPerc(stats.mtto.ok, stats.mtto.total);
+        chartInstances['row_chart2'] = new Chart(getFreshCanvas('row_chart2'), {
+            type: 'bar',
+            data: { labels: ['Cumplimiento MTTO'], datasets: [{ label: 'Cerradas', data: [pMttoCump], backgroundColor: '#3b82f6', barPercentage: 0.5, borderRadius: 6 }] },
+            options: { 
+                ...commonOptsRow, indexAxis: 'y', scales: { x: { max: 100, grid: {color:'#f1f5f9'} }, y: { grid: {display:false} } }, 
+                plugins: { ...commonOptsRow.plugins, legend: { display: false } },
+                onClick: (e, els, ch) => { if(els.length>0) showDataModal('Mantenimiento (General)', d => !isAseoAct(d)); }
+            }
+        });
+
+        let pAseoCump = getPerc(stats.aseo.ok, stats.aseo.total);
+        chartInstances['row_chart3'] = new Chart(getFreshCanvas('row_chart3'), {
+            type: 'bar',
+            data: { labels: ['Cumpl. Aseo / Sanit. y Seg.'], datasets: [{ label: 'Cerradas', data: [pAseoCump], backgroundColor: '#eab308', barPercentage: 0.5, borderRadius: 6 }] },
+            options: { 
+                ...commonOptsRow, indexAxis: 'y', scales: { x: { max: 100, grid: {color:'#f1f5f9'} }, y: { grid: {display:false} } }, 
+                plugins: { ...commonOptsRow.plugins, legend: { display: false } },
+                onClick: (e, els, ch) => { if(els.length>0) showDataModal('Aseo / Sanitización y Seguridad', d => isAseoAct(d)); }
+            }
+        });
+
+        const pLabels = ['L1', 'L2', 'L3', 'L4', 'L5'];
+        const pMttoData = pLabels.map(l => getPerc(stats.panaderia[l].mtto.ok, stats.panaderia[l].mtto.tot));
+        
+        chartInstances['row_chart4'] = new Chart(getFreshCanvas('row_chart4'), {
+            type: 'bar',
+            data: { 
+                labels: pLabels, 
+                datasets: [ { label: '% Cumpl. Mtto', data: pMttoData, backgroundColor: '#3b82f6', borderRadius: 4, barPercentage: 0.8, categoryPercentage: 0.8 } ] 
+            },
+            options: { 
+                ...commonOptsRow, indexAxis: 'y', scales: { x: { max: 100, grid: {color:'#f1f5f9'} }, y: { grid: {display:false} } }, 
+                plugins: { ...commonOptsRow.plugins, legend: { display: false } },
+                onClick: (e, els, ch) => { 
+                    if(els.length>0) {
+                        let label = ch.data.labels[els[0].index];
+                        showDataModal('Panadería MTTO - ' + label, d => !isAseoAct(d) && getPLoc(d) === label);
+                    }
+                }
+            }
+        });
+
+        const dLabels = ['Pizza', 'Bolleria', 'Empanadas'];
+        const dMttoData = dLabels.map(l => getPerc(stats.dely[l].mtto.ok, stats.dely[l].mtto.tot));
+        
+        chartInstances['row_chart5'] = new Chart(getFreshCanvas('row_chart5'), {
+            type: 'bar',
+            data: { 
+                labels: dLabels, 
+                datasets: [ { label: '% Cumpl. Mtto', data: dMttoData, backgroundColor: '#3b82f6', borderRadius: 4, barPercentage: 0.8, categoryPercentage: 0.8 } ] 
+            },
+            options: { 
+                ...commonOptsRow, indexAxis: 'y', scales: { x: { max: 100, grid: {color:'#f1f5f9'} }, y: { grid: {display:false} } }, 
+                plugins: { ...commonOptsRow.plugins, legend: { display: false } },
+                onClick: (e, els, ch) => { 
+                    if(els.length>0) {
+                        let label = ch.data.labels[els[0].index];
+                        showDataModal('Dely MTTO - ' + label, d => !isAseoAct(d) && getDLoc(d) === label);
+                    }
+                }
+            }
+        });
     }
 
+    // ==========================================
+    // NUEVA FUNCIÓN PARA CONSTRUIR EL GANTT DE TURNOS
+    // ==========================================
     function drawGantt(data) {
         const container = document.getElementById('gantt_container');
         container.innerHTML = '';
-        if (!data || data.length === 0) { container.innerHTML = "No hay datos"; return; }
+        
+        if (!data || data.length === 0) {
+            container.innerHTML = `<div class="empty-state" style="width:100%;"><h3>No hay datos para graficar turnos</h3><p>Intenta cambiar los filtros superiores.</p></div>`;
+            return;
+        }
+
         const diasOrden = ['Jueves', 'Viernes', 'Sabado', 'Domingo', 'Lunes', 'Martes', 'Miercoles'];
         
+        let schedule = {};
+        diasOrden.forEach(d => {
+            schedule[d] = {
+                totalHH: 0,
+                turnos: { 
+                    'Mañana': { hh: 0, act: [] }, 
+                    'Tarde': { hh: 0, act: [] }, 
+                    'Noche': { hh: 0, act: [] }, 
+                    'Cuarto Turno': { hh: 0, act: [] },
+                    'Sin Turno Asignado': { hh: 0, act: [] } 
+                }
+            };
+        });
+
+        const getShift = (t1, t2, t3) => {
+            let combo = (String(t1) + " " + String(t2) + " " + String(t3)).toUpperCase();
+            
+            // Forzamos a Mañana a los Lubricadores y Externos (LM1 y EM1-8), además de los AM/MM normales de mañana
+            if (/(AM[1-3]|MM[1-3]|LM1|EM[1-8])/.test(combo)) return 'Mañana';
+            if (/(AT[1-3]|MT[1-3])/.test(combo)) return 'Tarde';
+            if (/(AN[1-3]|MN[1-3])/.test(combo)) return 'Noche';
+            if (/(M4[1-3])/.test(combo)) return 'Cuarto Turno';
+            
+            // Fallbacks de seguridad
+            if (combo.includes('MM') || combo.includes('AM') || combo.includes('LM') || combo.includes('EM')) return 'Mañana';
+            if (combo.includes('MT') || combo.includes('AT')) return 'Tarde';
+            if (combo.includes('MN') || combo.includes('AN')) return 'Noche';
+            
+            return 'Sin Turno Asignado';
+        };
+
+        const normalizarDia = (d) => {
+            if(!d || d === 'ALL') return 'Sin Día Asignado';
+            let lower = String(d).toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, ""); 
+            if(lower.includes('lun')) return 'Lunes';
+            if(lower.includes('mar')) return 'Martes';
+            if(lower.includes('mier')) return 'Miercoles';
+            if(lower.includes('jue')) return 'Jueves';
+            if(lower.includes('vie')) return 'Viernes';
+            if(lower.includes('sab')) return 'Sabado';
+            if(lower.includes('dom')) return 'Domingo';
+            return 'Sin Día Asignado';
+        };
+
+        data.forEach(item => {
+            let d = normalizarDia(item.dia);
+            
+            if (!schedule[d]) {
+                schedule[d] = { 
+                    totalHH: 0, 
+                    turnos: { 'Mañana': { hh: 0, act: [] }, 'Tarde': { hh: 0, act: [] }, 'Noche': { hh: 0, act: [] }, 'Cuarto Turno': { hh: 0, act: [] }, 'Sin Turno Asignado': { hh: 0, act: [] } } 
+                };
+                if (!diasOrden.includes(d)) diasOrden.push(d);
+            }
+            
+            let shift = getShift(item.tecnico, item.tecnico1, item.tecnico2);
+            let hh = parseFloat(item.hh) || 0;
+            
+            schedule[d].totalHH += hh;
+            schedule[d].turnos[shift].hh += hh;
+            schedule[d].turnos[shift].act.push(item);
+        });
+
         let htmlFinal = "";
         diasOrden.forEach(dia => {
-            htmlFinal += `<div class="gantt-day-col"><div class="gantt-day-header"><h3 class="gantt-day-title">${dia}</h3></div><div style="padding:15px; flex:1; background:#f8fafc;">`;
+            let dayData = schedule[dia];
+            if(!dayData) return;
             
-            const actsDia = data.filter(x => {
-                let d = x.dia.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-                return d.includes(dia.toLowerCase().substring(0,3));
-            });
+            let turnosArr = Object.values(dayData.turnos);
+            let isEmpty = turnosArr.every(t => t.act.length === 0);
+            
+            if (isEmpty && (dia === 'Sabado' || dia === 'Domingo' || dia === 'Sin Día Asignado')) return; 
 
-            ['Mañana', 'Tarde', 'Noche', 'Cuarto Turno'].forEach(turno => {
-                const actsTurno = actsDia.filter(a => {
-                    let combo = (a.tecnico + a.tecnico1 + a.tecnico2).toUpperCase();
-                    if (turno === 'Mañana') return /(AM[1-3]|MM[1-3]|LM1|EM[1-8])/.test(combo);
-                    if (turno === 'Tarde') return /(AT[1-3]|MT[1-3])/.test(combo);
-                    if (turno === 'Noche') return /(AN[1-3]|MN[1-3])/.test(combo);
-                    return /(M4[1-3])/.test(combo);
-                });
+            htmlFinal += `<div class="gantt-day-col">
+                <div class="gantt-day-header">
+                    <h3 class="gantt-day-title">${dia}</h3>
+                    <span class="gantt-day-hh">Total Carga: ${dayData.totalHH.toFixed(1)} HH</span>
+                </div>
+                <div style="padding:15px; display:flex; flex-direction:column; overflow-y:auto; flex:1; background:#f8fafc;">`;
 
-                if (actsTurno.length > 0) {
-                    htmlFinal += `<div class="gantt-shift-box"><strong>${turno}</strong>`;
-                    actsTurno.forEach(a => {
-                        htmlFinal += `<div class="gantt-card" style="border-left:4px solid ${a.status==='realizada'?'#10b981':'#ef4444'}" onclick="renderDetail('${a.key_id}')">${a.titulo}</div>`;
+            ['Mañana', 'Tarde', 'Noche', 'Cuarto Turno', 'Sin Turno Asignado'].forEach(turno => {
+                let tData = dayData.turnos[turno];
+                if (tData.act.length > 0) {
+                    let tColor = '#94a3b8'; // Defecto gris
+                    if (turno === 'Mañana') tColor = '#3b82f6'; // Azul
+                    else if (turno === 'Tarde') tColor = '#f59e0b'; // Naranja
+                    else if (turno === 'Noche') tColor = '#8b5cf6'; // Morado
+                    else if (turno === 'Cuarto Turno') tColor = '#ec4899'; // Rosado
+                    
+                    htmlFinal += `
+                    <div class="gantt-shift-box" style="border:1px solid ${tColor}40; background:${tColor}10;">
+                        <div class="gantt-shift-header" style="color:${tColor}; border-bottom:1px solid ${tColor}40;">
+                            <span>${turno}</span>
+                            <span>${tData.hh.toFixed(1)} HH</span>
+                        </div>`;
+                    
+                    tData.act.forEach(a => {
+                        let statusColor = a.status === 'realizada' ? '#10b981' : (a.status === 'en proceso' ? '#f59e0b' : '#ef4444');
+                        let actTitle = a.titulo.length > 40 ? a.titulo.substring(0,40) + '...' : a.titulo;
+                        
+                        let tecnicosIds = [a.tecnico, a.tecnico1, a.tecnico2].filter(x => x && x !== 'ALL').join(' | ');
+                        let nombreCorto = a.ejecutor ? a.ejecutor.split(' ')[0] : 'S/A';
+
+                        htmlFinal += `
+                        <div class="gantt-card" style="border-left-color:${statusColor};" onclick="document.getElementById('btn_tab_list').click(); setTimeout(() => renderDetail('${a.key_id}'), 100);">
+                            <div style="font-weight:700; color:var(--primary); margin-bottom:4px; display:flex; justify-content:space-between;">
+                                <span>${a.ot || a.tag || '#'+a.id_real}</span>
+                                <span style="font-size:0.7rem; color:${statusColor};">${a.status.toUpperCase()}</span>
+                            </div>
+                            <div style="color:var(--secondary); margin-bottom:6px; line-height:1.3;">${actTitle}</div>
+                            <div style="color:var(--muted); font-size:0.7rem; display:flex; justify-content:space-between; align-items:flex-end;">
+                                <div style="display:flex; flex-direction:column;">
+                                    <span style="font-weight:600;">👷 ${nombreCorto}</span>
+                                    <span style="font-size:0.65rem; opacity:0.8;">[${tecnicosIds || 'Sin Códigos'}]</span>
+                                </div>
+                                <span style="font-weight:700; color:var(--text); background:#e2e8f0; padding:2px 6px; border-radius:4px;">⏱️ ${parseFloat(a.hh||0).toFixed(1)} HH</span>
+                            </div>
+                        </div>`;
                     });
                     htmlFinal += `</div>`;
                 }
             });
+
             htmlFinal += `</div></div>`;
         });
+        
         container.innerHTML = htmlFinal;
     }
 
-    const initAntigravity = () => { /* ... Partículas background ... */ };
+    // --- EFECTO ANTIGRAVEDAD / PARTÍCULAS ---
+    const initAntigravity = () => {
+        const canvas = document.createElement('canvas');
+        canvas.id = 'antigravity-bg';
+        document.body.prepend(canvas);
+        const ctx = canvas.getContext('2d');
+
+        canvas.style.position = 'fixed';
+        canvas.style.top = '0';
+        canvas.style.left = '0';
+        canvas.style.width = '100vw';
+        canvas.style.height = '100vh';
+        canvas.style.zIndex = '-1'; 
+        canvas.style.pointerEvents = 'none';
+        canvas.style.backgroundColor = '#f8fafc';
+
+        let particles = [];
+        const colors = ['#4285F4', '#EA4335', '#FBBC05', '#34A853', '#A0C3FF', '#FCA297'];
+        let mouse = { x: null, y: null, radius: 120 };
+
+        window.addEventListener('mousemove', (e) => {
+            mouse.x = e.x;
+            mouse.y = e.y;
+        });
+
+        window.addEventListener('mouseout', () => {
+            mouse.x = undefined;
+            mouse.y = undefined;
+        });
+
+        window.addEventListener('resize', () => {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+            initParticles();
+        });
+
+        class Particle {
+            constructor(x, y) {
+                this.x = x;
+                this.y = y;
+                this.baseX = x;
+                this.baseY = y;
+                this.size = Math.random() * 2 + 1.5;
+                this.color = colors[Math.floor(Math.random() * colors.length)];
+                this.density = (Math.random() * 20) + 2;
+            }
+            draw() {
+                ctx.fillStyle = this.color;
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+                ctx.closePath();
+                ctx.fill();
+            }
+            update() {
+                let dx = mouse.x - this.x;
+                let dy = mouse.y - this.y;
+                let distance = Math.sqrt(dx * dx + dy * dy);
+                
+                if (distance < mouse.radius) {
+                    let forceDirectionX = dx / distance;
+                    let forceDirectionY = dy / distance;
+                    let force = (mouse.radius - distance) / mouse.radius;
+                    let directionX = forceDirectionX * force * this.density;
+                    let directionY = forceDirectionY * force * this.density;
+                    
+                    this.x -= directionX;
+                    this.y -= directionY;
+                } else {
+                    if (this.x !== this.baseX) {
+                        let dx = this.x - this.baseX;
+                        this.x -= dx / 15;
+                    }
+                    if (this.y !== this.baseY) {
+                        let dy = this.y - this.baseY;
+                        this.y -= dy / 15;
+                    }
+                }
+                this.draw();
+            }
+        }
+
+        function initParticles() {
+            particles = [];
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+            let numberOfParticles = (canvas.width * canvas.height) / 7000;
+            for (let i = 0; i < numberOfParticles; i++) {
+                let x = Math.random() * canvas.width;
+                let y = Math.random() * canvas.height;
+                particles.push(new Particle(x, y));
+            }
+        }
+
+        function animateParticles() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            for (let i = 0; i < particles.length; i++) {
+                particles[i].update();
+            }
+            requestAnimationFrame(animateParticles);
+        }
+
+        initParticles();
+        animateParticles();
+    };
 
     window.onload = () => {
         buildFilters();
         applyFilters();
+        initAntigravity();
     };
     </script>
 </body></html>"""
