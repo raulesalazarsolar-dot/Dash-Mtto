@@ -98,14 +98,13 @@ def main():
         
         print("   ⏳ Solicitando registros y adjuntos...")
         
-        # AGREGADAS LAS NUEVAS COLUMNAS CON LOS NOMBRES INTERNOS EXACTOS
         columnas_req = [
             "Id", "Title", "LinkTitle", "field_2", "field_3", "field_4", 
             "field_5", "field_6", "field_7", "Responsable", "field_10", 
             "field_11", "field_14", "field_15", "Antes", "Despues", 
             "field_1", "ClaseM", "Zona", "Planta", "Attachments", "AttachmentFiles", "HH", 
             "Duraci_x00f3_n_x0028_HR_x0029_", "CantidadPersonas",
-            "Dia", "Tecnico", "Tecnico2", "Tecnico3"
+            "Dia", "Tecnico", "Tecnico2", "Tecnico3", "Criticidad"
         ]
         
         try:
@@ -123,13 +122,11 @@ def main():
             p = item.properties
             
             semana_val = limpiar(p.get("field_1"))
-            # FILTRO ESTRICTO: Solo dejar semanas 19 y 20
             if semana_val not in ["19", "20"]:
                 continue
 
             item_id = int(p.get("Id", 0))
 
-            # ASIGNACIÓN DE PLANTA
             planta_raw = limpiar(p.get("Planta")).lower()
             planta_final = "carne" if "carne" in planta_raw else "masas"
 
@@ -143,11 +140,11 @@ def main():
             elif any(k in status_txt for k in ['proceso', 'tratando', 'curso']): status = "en proceso"
             else: status = "pendiente"
 
-            prio_raw = normalizar_texto(limpiar(p.get("field_10"))) 
-            if "calavera" in prio_raw or "0" in prio_raw: prio = "0"
-            elif "alta" in prio_raw or "1" in prio_raw: prio = "1"
-            elif "media" in prio_raw or "2" in prio_raw: prio = "2"
-            else: prio = "3"
+            crit_raw = normalizar_texto(limpiar(p.get("Criticidad")))
+            if "crit" in crit_raw: crit_final = "Critica"
+            elif "mayor" in crit_raw: crit_final = "Mayor"
+            elif "menor" in crit_raw: crit_final = "Menor"
+            else: crit_final = "Sin Asignar"
 
             clase_str = limpiar(p.get("ClaseM")).title()
             clase_final = clase_str if clase_str and clase_str.lower() != "none" else "General"
@@ -173,7 +170,7 @@ def main():
                 "semana": semana_val,
                 "planta": planta_final,
                 "ejecutor": limpiar(p.get("Responsable")) or "Sin Asignar",
-                "prioridad": prio,
+                "criticidad": crit_final,
                 "ubicacion": limpiar(p.get("field_5")),
                 "sub_ubi": limpiar(p.get("field_6")),
                 "ot": limpiar(p.get("field_7")),
@@ -191,7 +188,6 @@ def main():
                 "hh": hh_val,
                 "duracion": duracion_val,
                 "dotacion": dotacion_val,
-                # NUEVAS COLUMNAS MAPEADAS CON SUS NOMBRES INTERNOS EXACTOS
                 "dia": limpiar(p.get("Dia")).title(),
                 "tecnico": limpiar(p.get("Tecnico")).upper(),
                 "tecnico1": limpiar(p.get("Tecnico2")).upper(),
@@ -306,11 +302,10 @@ def generar_html_moderno(db_json):
         .chart-title { font-size: 1rem; font-weight: 700; color: var(--secondary); margin-bottom: 15px; text-transform: uppercase; text-align: center; }
         .canvas-container { position: relative; flex: 1 1 auto; width: 100%; min-height: 0; }
         
-        .prio-flag { padding: 4px 10px; border-radius: 6px; font-weight: 700; font-size: 0.75rem; }
+        .prio-flag { padding: 4px 10px; border-radius: 6px; font-weight: 700; font-size: 0.75rem; text-transform: uppercase; }
         .p-crit { background: #fee2e2; color: #dc2626; border: 1px solid #f87171; }
         .p-alta { background: #ffedd5; color: #ea580c; border: 1px solid #fdba74; }
-        .p-med { background: #fef3c7; color: #d97706; border: 1px solid #fcd34d; }
-        .p-baja { background: #f1f5f9; color: #64748b; border: 1px solid #cbd5e1; }
+        .p-baja { background: #dcfce7; color: #166534; border: 1px solid #86efac; }
         
         .modal { display: none; position: fixed; z-index: 2000; left: 0; top: 0; width: 100%; height: 100%; background: rgba(15, 23, 42, 0.85); align-items: center; justify-content: center; backdrop-filter: blur(4px); }
         .modal img { max-width: 90%; max-height: 90vh; border-radius: 8px; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.5); }
@@ -513,7 +508,6 @@ def generar_html_moderno(db_json):
     Chart.defaults.font.family = "'Segoe UI', system-ui, sans-serif";
     Chart.defaults.color = '#64748b';
 
-    // FUNCIÓN CENTRALIZADA PARA IDENTIFICAR EL ÁREA DEL TÉCNICO
     const getAreaResp = (ejecutor) => {
         let ejL = (ejecutor || '').toLowerCase();
         
@@ -560,9 +554,19 @@ def generar_html_moderno(db_json):
         html += createSelect('f_semana', '📆 Semana', weeks, '20');
         html += createSelect('f_zona', '📍 Zona', [...new Set(records.map(x=>x.zona))].filter(Boolean).sort());
         html += createSelect('f_clase', '🛠️ Clase MTTO', [...new Set(records.map(x=>x.clase))].sort());
+        
+        html += createSelect('f_especialidad', '🧑‍🔧 Especialidad', ['Mecánico', 'Autómata', 'Frio', 'Infraestructura', 'Otros'].sort());
+        
         html += createSelect('f_exec', '👷 Responsable', [...new Set(records.map(x=>x.ejecutor))].sort());
         html += createSelect('f_ubi', '🏭 Línea / Área', [...new Set(records.map(x=>x.ubicacion))].sort());
         
+        html += `<div class="f-group"><label>⚠️ Criticidad</label><select id="f_criticidad" onchange="applyFilters()">
+            <option value="ALL">Todas</option>
+            <option value="Critica">🚨 Crítica</option>
+            <option value="Mayor">🔴 Mayor</option>
+            <option value="Menor">🟢 Menor</option>
+        </select></div>`;
+
         html += `<div class="f-group"><label>🚦 Estado</label><select id="f_status" onchange="applyFilters()">
             <option value="ALL">Todas las OTs</option>
             <option value="abiertas">Backlog (No Cerradas)</option>
@@ -615,6 +619,10 @@ def generar_html_moderno(db_json):
         const stVal = document.getElementById('f_status') ? document.getElementById('f_status').value : 'ALL';
         const semVal = document.getElementById('f_semana') ? document.getElementById('f_semana').value : 'ALL';
         const zVal = document.getElementById('f_zona') ? document.getElementById('f_zona').value : 'ALL';
+        const espVal = document.getElementById('f_especialidad') ? document.getElementById('f_especialidad').value : 'ALL';
+        
+        const critVal = document.getElementById('f_criticidad') ? document.getElementById('f_criticidad').value : 'ALL';
+        
         const searchVal = document.getElementById('search_input') ? document.getElementById('search_input').value.toLowerCase().trim() : '';
 
         let topWeekTitle = "Semanas Cargadas: " + (weeks.length > 0 ? weeks.join(', ') : "Ninguna");
@@ -639,6 +647,10 @@ def generar_html_moderno(db_json):
             if (uVal !== 'ALL' && d.ubicacion !== uVal) return false;
             if (semVal !== 'ALL' && d.semana !== semVal) return false;
             if (zVal !== 'ALL' && d.zona !== zVal) return false;
+            
+            if (espVal !== 'ALL' && getAreaResp(d.ejecutor) !== espVal) return false;
+            
+            if (critVal !== 'ALL' && d.criticidad !== critVal) return false;
             
             return true;
         });
@@ -726,11 +738,12 @@ def generar_html_moderno(db_json):
             extraDiv.style.display = 'none';
         }
 
-        let pl = d.prioridad;
-        if(pl==='0') pl='<span class="prio-flag p-crit">🚨 ALTA / CRÍTICA</span>';
-        else if(pl==='1') pl='<span class="prio-flag p-alta">🔴 ALTA</span>';
-        else if(pl==='2') pl='<span class="prio-flag p-med">🟡 MEDIA</span>';
-        else pl='<span class="prio-flag p-baja">🟢 BAJA</span>';
+        let crit = d.criticidad;
+        let pl = '';
+        if(crit === 'Critica') pl='<span class="prio-flag p-crit">🚨 CRÍTICA</span>';
+        else if(crit === 'Mayor') pl='<span class="prio-flag p-alta">🔴 MAYOR</span>';
+        else if(crit === 'Menor') pl='<span class="prio-flag p-baja">🟢 MENOR</span>';
+        else pl='<span class="prio-flag" style="background:#f1f5f9; color:#64748b; border:1px solid #cbd5e1;">⚪ S/A</span>';
         document.getElementById('d_prio_lbl').innerHTML = pl;
 
         const grid = document.getElementById('d_grid');
@@ -746,8 +759,8 @@ def generar_html_moderno(db_json):
         grid.innerHTML += createItem('🏁 Cierre', d.f_cie);
         grid.innerHTML += createItem('📆 Semana', d.semana);
         grid.innerHTML += createItem('🧾 OT SAP', d.ot);
+        grid.innerHTML += createItem('⚠️ Criticidad', d.criticidad);
         
-        // MOSTRAR CAMPOS NUEVOS EN EL DETALLE SI EXISTEN
         if (d.dia) grid.innerHTML += createItem('📅 Día Asignado', d.dia);
         let techsList = [d.tecnico, d.tecnico1, d.tecnico2].filter(t => t && t !== 'ALL').join(', ');
         if (techsList) grid.innerHTML += createItem('🦺 Técnicos (Códigos)', techsList);
@@ -930,6 +943,7 @@ def generar_html_moderno(db_json):
             "Ubicación": d.ubicacion,
             "Sub Ubicación": d.sub_ubi,
             "OT": d.ot,
+            "Criticidad": d.criticidad,
             "Ejecutor": d.ejecutor,
             "Status": d.status.toUpperCase(),
             "Observación": d.observacion,
@@ -937,7 +951,6 @@ def generar_html_moderno(db_json):
             "Tiempo Ejecución (h)": d.duracion,
             "Dotación": d.dotacion,
             "Duración Total (HH)": d.hh,
-            // Agregando nuevas columnas al exportar Excel
             "Día Planificado": d.dia,
             "Código Turno 1": d.tecnico,
             "Código Turno 2": d.tecnico1,
@@ -950,8 +963,8 @@ def generar_html_moderno(db_json):
 
         const anchos = [
             { wch: 12 }, { wch: 12 }, { wch: 40 }, { wch: 15 }, { wch: 15 }, { wch: 15 }, { wch: 20 }, 
-            { wch: 20 }, { wch: 15 }, { wch: 20 }, { wch: 15 }, { wch: 50 }, { wch: 10 }, { wch: 15 }, 
-            { wch: 10 }, { wch: 15 }, { wch: 15 }, { wch: 15 }, { wch: 15 }, { wch: 15 }
+            { wch: 20 }, { wch: 15 }, { wch: 15 }, { wch: 20 }, { wch: 15 }, { wch: 50 }, { wch: 10 }, 
+            { wch: 15 }, { wch: 10 }, { wch: 15 }, { wch: 15 }, { wch: 15 }, { wch: 15 }, { wch: 15 }
         ];
         worksheet['!cols'] = anchos;
 
@@ -1539,7 +1552,6 @@ def generar_html_moderno(db_json):
             return;
         }
 
-        // --- CAMBIO 1: ORDEN DE LOS DÍAS ---
         const diasOrden = ['Jueves', 'Viernes', 'Sabado', 'Domingo', 'Lunes', 'Martes', 'Miercoles'];
         
         let schedule = {};
@@ -1551,24 +1563,22 @@ def generar_html_moderno(db_json):
                     'Tarde': { hh: 0, act: [] }, 
                     'Noche': { hh: 0, act: [] }, 
                     'Cuarto Turno': { hh: 0, act: [] },
-                    'Externos y Otros': { hh: 0, act: [] },
                     'Sin Turno Asignado': { hh: 0, act: [] } 
                 }
             };
         });
 
-        // --- CAMBIO 2: LÓGICA DE CLASIFICACIÓN USANDO REGEX ---
         const getShift = (t1, t2, t3) => {
             let combo = (String(t1) + " " + String(t2) + " " + String(t3)).toUpperCase();
             
-            if (/(AM[1-3]|MM[1-3])/.test(combo)) return 'Mañana';
+            // Forzamos a Mañana a los Lubricadores y Externos (LM1 y EM1-8), además de los AM/MM normales de mañana
+            if (/(AM[1-3]|MM[1-3]|LM1|EM[1-8])/.test(combo)) return 'Mañana';
             if (/(AT[1-3]|MT[1-3])/.test(combo)) return 'Tarde';
             if (/(AN[1-3]|MN[1-3])/.test(combo)) return 'Noche';
             if (/(M4[1-3])/.test(combo)) return 'Cuarto Turno';
-            if (/(MEX[1-8]|LUB)/.test(combo)) return 'Externos y Otros';
             
-            // Fallback genérico para atrapar combinaciones simples
-            if (combo.includes('MM') || combo.includes('AM')) return 'Mañana';
+            // Fallbacks de seguridad
+            if (combo.includes('MM') || combo.includes('AM') || combo.includes('LM') || combo.includes('EM')) return 'Mañana';
             if (combo.includes('MT') || combo.includes('AT')) return 'Tarde';
             if (combo.includes('MN') || combo.includes('AN')) return 'Noche';
             
@@ -1594,7 +1604,7 @@ def generar_html_moderno(db_json):
             if (!schedule[d]) {
                 schedule[d] = { 
                     totalHH: 0, 
-                    turnos: { 'Mañana': { hh: 0, act: [] }, 'Tarde': { hh: 0, act: [] }, 'Noche': { hh: 0, act: [] }, 'Cuarto Turno': { hh: 0, act: [] }, 'Externos y Otros': { hh: 0, act: [] }, 'Sin Turno Asignado': { hh: 0, act: [] } } 
+                    turnos: { 'Mañana': { hh: 0, act: [] }, 'Tarde': { hh: 0, act: [] }, 'Noche': { hh: 0, act: [] }, 'Cuarto Turno': { hh: 0, act: [] }, 'Sin Turno Asignado': { hh: 0, act: [] } } 
                 };
                 if (!diasOrden.includes(d)) diasOrden.push(d);
             }
@@ -1615,7 +1625,6 @@ def generar_html_moderno(db_json):
             let turnosArr = Object.values(dayData.turnos);
             let isEmpty = turnosArr.every(t => t.act.length === 0);
             
-            // Ocultamos la columna vacía solo si es Fin de Semana o Sin Asignar
             if (isEmpty && (dia === 'Sabado' || dia === 'Domingo' || dia === 'Sin Día Asignado')) return; 
 
             htmlFinal += `<div class="gantt-day-col">
@@ -1625,8 +1634,7 @@ def generar_html_moderno(db_json):
                 </div>
                 <div style="padding:15px; display:flex; flex-direction:column; overflow-y:auto; flex:1; background:#f8fafc;">`;
 
-            // --- CAMBIO 3: RENDERIZAR TODOS LOS TURNOS ---
-            ['Mañana', 'Tarde', 'Noche', 'Cuarto Turno', 'Externos y Otros', 'Sin Turno Asignado'].forEach(turno => {
+            ['Mañana', 'Tarde', 'Noche', 'Cuarto Turno', 'Sin Turno Asignado'].forEach(turno => {
                 let tData = dayData.turnos[turno];
                 if (tData.act.length > 0) {
                     let tColor = '#94a3b8'; // Defecto gris
@@ -1634,7 +1642,6 @@ def generar_html_moderno(db_json):
                     else if (turno === 'Tarde') tColor = '#f59e0b'; // Naranja
                     else if (turno === 'Noche') tColor = '#8b5cf6'; // Morado
                     else if (turno === 'Cuarto Turno') tColor = '#ec4899'; // Rosado
-                    else if (turno === 'Externos y Otros') tColor = '#14b8a6'; // Verde Agua
                     
                     htmlFinal += `
                     <div class="gantt-shift-box" style="border:1px solid ${tColor}40; background:${tColor}10;">
