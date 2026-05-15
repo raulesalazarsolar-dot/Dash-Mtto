@@ -98,12 +98,14 @@ def main():
         
         print("   ⏳ Solicitando registros y adjuntos...")
         
+        # AGREGADAS LAS NUEVAS COLUMNAS: dia, tecnico, tecnico1, tecnico2
         columnas_req = [
             "Id", "Title", "LinkTitle", "field_2", "field_3", "field_4", 
             "field_5", "field_6", "field_7", "Responsable", "field_10", 
             "field_11", "field_14", "field_15", "Antes", "Despues", 
             "field_1", "ClaseM", "Zona", "Planta", "Attachments", "AttachmentFiles", "HH", 
-            "Duraci_x00f3_n_x0028_HR_x0029_", "CantidadPersonas"
+            "Duraci_x00f3_n_x0028_HR_x0029_", "CantidadPersonas",
+            "dia", "tecnico", "tecnico1", "tecnico2"
         ]
         
         try:
@@ -188,7 +190,12 @@ def main():
                 "img_despues": img_despues,
                 "hh": hh_val,
                 "duracion": duracion_val,
-                "dotacion": dotacion_val
+                "dotacion": dotacion_val,
+                # NUEVAS COLUMNAS MAPEADAS
+                "dia": limpiar(p.get("dia")).title(),
+                "tecnico": limpiar(p.get("tecnico")).upper(),
+                "tecnico1": limpiar(p.get("tecnico1")).upper(),
+                "tecnico2": limpiar(p.get("tecnico2")).upper()
             }
             
         print("\n ✅ Procesamiento finalizado. Construyendo HTML...")
@@ -330,6 +337,16 @@ def generar_html_moderno(db_json):
         .summary-sub { font-size:0.8rem; color:#64748b; }
         .summary-bar-bg { width:100%; height:6px; background:#e2e8f0; border-radius:3px; margin-top:8px; overflow:hidden; }
         .summary-bar-fill { height:100%; transition:width 1s cubic-bezier(0.4, 0, 0.2, 1); }
+        
+        /* ESTILOS NUEVOS PARA GANTT */
+        .gantt-day-col { flex:1; min-width:320px; background:white; border:1px solid var(--border); border-radius:8px; display:flex; flex-direction:column; overflow:hidden; box-shadow:0 2px 4px rgba(0,0,0,0.02); }
+        .gantt-day-header { background:var(--secondary); color:white; padding:15px; text-align:center; }
+        .gantt-day-title { margin:0; font-size:1.1rem; text-transform:uppercase; font-weight:700; letter-spacing:0.5px;}
+        .gantt-day-hh { font-size:0.85rem; opacity:0.9; font-weight:600; display:block; margin-top:4px;}
+        .gantt-shift-box { border-radius:6px; padding:12px; margin-bottom:12px; }
+        .gantt-shift-header { display:flex; justify-content:space-between; font-weight:700; font-size:0.85rem; margin-bottom:10px; padding-bottom:6px; text-transform:uppercase; }
+        .gantt-card { background:white; border-left:4px solid transparent; padding:10px; margin-bottom:8px; border-radius:6px; font-size:0.8rem; cursor:pointer; box-shadow:0 2px 4px rgba(0,0,0,0.06); transition:transform 0.15s; }
+        .gantt-card:hover { transform: translateY(-2px); box-shadow:0 4px 6px rgba(0,0,0,0.1); }
     </style>
 </head>
 <body>
@@ -362,6 +379,7 @@ def generar_html_moderno(db_json):
             <button class="tab-btn active" onclick="setView('list', this)" id="btn_tab_list">📋 Visor de OTs</button>
             <button class="tab-btn" onclick="setView('charts', this)">📊 Análisis y Tendencias</button>
             <button class="tab-btn" onclick="setView('row', this)">📈 ROW</button>
+            <button class="tab-btn" onclick="setView('gantt', this)">📅 Gantt / Turnos</button> <!-- NUEVO BOTÓN GANTT -->
         </div>
         <div style="display:flex; gap:10px;">
             <button onclick="descargarExcel()" class="btn-clean" style="margin: 0; padding: 8px 15px; width: auto; border-color: #10b981; color: #10b981; display: flex; align-items: center; gap: 8px;" title="Descargar datos filtrados">
@@ -439,7 +457,6 @@ def generar_html_moderno(db_json):
                 <div id="summary_content" style="display:flex; flex-direction:column; justify-content:space-around; flex:1;"></div>
             </div>
             
-            <!-- NUEVO GRÁFICO: HH POR ÁREA MOVIDO AQUÍ -->
             <div class="chart-card wide">
                 <div class="chart-title">Desglose de Tiempos (HH) por Área</div>
                 <div class="canvas-container"><canvas id="chart_hh_area"></canvas></div>
@@ -472,6 +489,16 @@ def generar_html_moderno(db_json):
             </div>
         </div>
 
+        <!-- NUEVA VISTA GANTT / TURNOS -->
+        <div id="view_gantt" style="display:none; flex:1; flex-direction:column; overflow-y:auto; padding:30px; background:#f8fafc;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px; flex-wrap:wrap; gap:15px;">
+                <h2 style="color:var(--primary); margin:0; font-size:1.8rem;">Planificación de Turnos y Carga Técnica</h2>
+            </div>
+            <div id="gantt_container" style="display:flex; gap:20px; overflow-x:auto; padding-bottom:15px; flex:1;">
+                <!-- Días inyectados vía JS -->
+            </div>
+        </div>
+
     </div>
 
     <script>
@@ -494,7 +521,6 @@ def generar_html_moderno(db_json):
     const getAreaResp = (ejecutor) => {
         let ejL = (ejecutor || '').toLowerCase();
         
-        // Array con todos los nombres o palabras clave para Mecánico
         let mecanicos = ['luis lagos', 'luis guajardo', 'rubén carrasco', 'ruben carrasco', 
                          'marcelo rivera', 'vladimir berrios', 'rubén briceño', 'ruben briceño', 
                          'mantenimiento', 'javier cordova', 'nicolás chandia', 'nicolas chandia'];
@@ -569,6 +595,7 @@ def generar_html_moderno(db_json):
         document.getElementById('view_list').style.display = 'none';
         document.getElementById('view_charts').style.display = 'none';
         document.getElementById('view_row').style.display = 'none';
+        document.getElementById('view_gantt').style.display = 'none';
 
         if (view === 'list') {
             document.getElementById('view_list').style.display = 'flex';
@@ -578,6 +605,9 @@ def generar_html_moderno(db_json):
         } else if (view === 'row') {
             document.getElementById('view_row').style.display = 'flex';
             setTimeout(() => { drawRowCharts(currentChartData); }, 50);
+        } else if (view === 'gantt') {
+            document.getElementById('view_gantt').style.display = 'flex';
+            setTimeout(() => { drawGantt(currentChartData); }, 50);
         }
         applyFilters();
     }
@@ -637,6 +667,7 @@ def generar_html_moderno(db_json):
         if(appState.view === 'list') renderList(currentChartData);
         else if (appState.view === 'charts') drawCharts(currentChartData);
         else if (appState.view === 'row') drawRowCharts(currentChartData);
+        else if (appState.view === 'gantt') drawGantt(currentChartData);
     }
 
     function renderList(data) {
@@ -720,6 +751,11 @@ def generar_html_moderno(db_json):
         grid.innerHTML += createItem('📆 Semana', d.semana);
         grid.innerHTML += createItem('🧾 OT SAP', d.ot);
         
+        // MOSTRAR CAMPOS NUEVOS EN EL DETALLE SI EXISTEN
+        if (d.dia) grid.innerHTML += createItem('📅 Día Asignado', d.dia);
+        let techsList = [d.tecnico, d.tecnico1, d.tecnico2].filter(t => t && t !== 'ALL').join(', ');
+        if (techsList) grid.innerHTML += createItem('🦺 Técnicos (Códigos)', techsList);
+
         document.getElementById('box_obs1').style.display = 'block';
         document.getElementById('d_obs').innerText = d.observacion || 'Sin observaciones registradas.';
         
@@ -904,7 +940,12 @@ def generar_html_moderno(db_json):
             "Semana": d.semana,
             "Tiempo Ejecución (h)": d.duracion,
             "Dotación": d.dotacion,
-            "Duración Total (HH)": d.hh
+            "Duración Total (HH)": d.hh,
+            // Agregando nuevas columnas al exportar Excel
+            "Día Planificado": d.dia,
+            "Código Turno 1": d.tecnico,
+            "Código Turno 2": d.tecnico1,
+            "Código Turno 3": d.tecnico2
         }));
 
         const worksheet = XLSX.utils.json_to_sheet(datosExcel);
@@ -913,7 +954,8 @@ def generar_html_moderno(db_json):
 
         const anchos = [
             { wch: 12 }, { wch: 12 }, { wch: 40 }, { wch: 15 }, { wch: 15 }, { wch: 15 }, { wch: 20 }, 
-            { wch: 20 }, { wch: 15 }, { wch: 20 }, { wch: 15 }, { wch: 50 }, { wch: 10 }, { wch: 15 }, { wch: 10 }, { wch: 15 }
+            { wch: 20 }, { wch: 15 }, { wch: 20 }, { wch: 15 }, { wch: 50 }, { wch: 10 }, { wch: 15 }, 
+            { wch: 10 }, { wch: 15 }, { wch: 15 }, { wch: 15 }, { wch: 15 }, { wch: 15 }
         ];
         worksheet['!cols'] = anchos;
 
@@ -1006,7 +1048,6 @@ def generar_html_moderno(db_json):
                 if(isOk) stats.wCounts[d.semana].ok++;
             }
             
-            // Usamos la función centralizada para identificar el área
             let area = getAreaResp(d.ejecutor);
             
             if (statsArea[area]) {
@@ -1144,9 +1185,6 @@ def generar_html_moderno(db_json):
             }
         });
         
-        // ==========================================
-        // NUEVO GRÁFICO: HH POR ÁREA (Mecánico, Autómata, Frio, Infraestructura)
-        // ==========================================
         let statsAreaHH = {
             'Mecánico': { ok: 0, proc: 0, pend: 0, sin_hh: 0 },
             'Autómata': { ok: 0, proc: 0, pend: 0, sin_hh: 0 },
@@ -1156,8 +1194,6 @@ def generar_html_moderno(db_json):
         
         data.forEach(d => {
             let a = getAreaResp(d.ejecutor);
-            
-            // Si el área mapeada es una de las 4 principales, la sumamos.
             if (statsAreaHH[a]) {
                 let hh = parseFloat(d.hh) || 0;
                 if (hh > 0) {
@@ -1170,7 +1206,6 @@ def generar_html_moderno(db_json):
             }
         });
 
-        // Ordenamos por cantidad de carga total de horas
         let labelsAreaHH = Object.keys(statsAreaHH).sort((a, b) => {
             let totA = statsAreaHH[a].ok + statsAreaHH[a].proc + statsAreaHH[a].pend;
             let totB = statsAreaHH[b].ok + statsAreaHH[b].proc + statsAreaHH[b].pend;
@@ -1280,8 +1315,6 @@ def generar_html_moderno(db_json):
                             else isStMatch = (d.status !== 'realizada' && d.status !== 'en proceso');
                             
                             if (!isStMatch) return false;
-
-                            // Usamos la función centralizada para el click también
                             return getAreaResp(d.ejecutor) === label;
                         });
                     }
@@ -1496,6 +1529,134 @@ def generar_html_moderno(db_json):
                 }
             }
         });
+    }
+
+    // ==========================================
+    // NUEVA FUNCIÓN PARA CONSTRUIR EL GANTT DE TURNOS
+    // ==========================================
+    function drawGantt(data) {
+        const container = document.getElementById('gantt_container');
+        container.innerHTML = '';
+        
+        if (!data || data.length === 0) {
+            container.innerHTML = `<div class="empty-state" style="width:100%;"><h3>No hay datos para graficar turnos</h3><p>Intenta cambiar los filtros superiores.</p></div>`;
+            return;
+        }
+
+        const diasOrden = ['Lunes', 'Martes', 'Miercoles', 'Jueves', 'Viernes', 'Sabado', 'Domingo'];
+        
+        let schedule = {};
+        diasOrden.forEach(d => {
+            schedule[d] = {
+                totalHH: 0,
+                turnos: { 
+                    'Mañana': { hh: 0, act: [] }, 
+                    'Tarde': { hh: 0, act: [] }, 
+                    'Noche': { hh: 0, act: [] }, 
+                    'Sin Turno Asignado': { hh: 0, act: [] } 
+                }
+            };
+        });
+
+        // Lógica de clasificación de turnos usando las variables exactas solicitadas (MM1, MT2, MN3...)
+        const getShift = (t1, t2, t3) => {
+            let combo = (String(t1) + " " + String(t2) + " " + String(t3)).toUpperCase();
+            if (combo.includes('MM')) return 'Mañana';
+            if (combo.includes('MT')) return 'Tarde';
+            if (combo.includes('MN')) return 'Noche';
+            return 'Sin Turno Asignado';
+        };
+
+        const normalizarDia = (d) => {
+            if(!d || d === 'ALL') return 'Sin Día Asignado';
+            let lower = String(d).toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, ""); // quita tildes
+            if(lower.includes('lun')) return 'Lunes';
+            if(lower.includes('mar')) return 'Martes';
+            if(lower.includes('mier')) return 'Miercoles';
+            if(lower.includes('jue')) return 'Jueves';
+            if(lower.includes('vie')) return 'Viernes';
+            if(lower.includes('sab')) return 'Sabado';
+            if(lower.includes('dom')) return 'Domingo';
+            return 'Sin Día Asignado';
+        };
+
+        data.forEach(item => {
+            let d = normalizarDia(item.dia);
+            // Si tiene un día no tipificado, lo agregamos dinámicamente
+            if (!schedule[d]) {
+                schedule[d] = { totalHH: 0, turnos: { 'Mañana': { hh: 0, act: [] }, 'Tarde': { hh: 0, act: [] }, 'Noche': { hh: 0, act: [] }, 'Sin Turno Asignado': { hh: 0, act: [] } } };
+                if (!diasOrden.includes(d)) diasOrden.push(d);
+            }
+            
+            let shift = getShift(item.tecnico, item.tecnico1, item.tecnico2);
+            let hh = parseFloat(item.hh) || 0;
+            
+            schedule[d].totalHH += hh;
+            schedule[d].turnos[shift].hh += hh;
+            schedule[d].turnos[shift].act.push(item);
+        });
+
+        // Generar Columnas HTML para el Kanban/Gantt
+        let htmlFinal = "";
+        diasOrden.forEach(dia => {
+            let dayData = schedule[dia];
+            if(!dayData) return;
+            
+            // Ocultamos la columna si el día no tiene nada programado para ahorrar espacio visual
+            let isEmpty = (dayData.turnos['Mañana'].act.length === 0 && dayData.turnos['Tarde'].act.length === 0 && dayData.turnos['Noche'].act.length === 0 && dayData.turnos['Sin Turno Asignado'].act.length === 0);
+            if (isEmpty && (dia === 'Sabado' || dia === 'Domingo' || dia === 'Sin Día Asignado')) return; 
+
+            htmlFinal += `<div class="gantt-day-col">
+                <div class="gantt-day-header">
+                    <h3 class="gantt-day-title">${dia}</h3>
+                    <span class="gantt-day-hh">Total Carga: ${dayData.totalHH.toFixed(1)} HH</span>
+                </div>
+                <div style="padding:15px; display:flex; flex-direction:column; overflow-y:auto; flex:1; background:#f8fafc;">`;
+
+            ['Mañana', 'Tarde', 'Noche', 'Sin Turno Asignado'].forEach(turno => {
+                let tData = dayData.turnos[turno];
+                if (tData.act.length > 0) {
+                    let tColor = turno==='Mañana' ? '#3b82f6' : (turno==='Tarde' ? '#f59e0b' : (turno==='Noche' ? '#8b5cf6' : '#94a3b8'));
+                    
+                    htmlFinal += `
+                    <div class="gantt-shift-box" style="border:1px solid ${tColor}40; background:${tColor}10;">
+                        <div class="gantt-shift-header" style="color:${tColor}; border-bottom:1px solid ${tColor}40;">
+                            <span>${turno}</span>
+                            <span>${tData.hh.toFixed(1)} HH</span>
+                        </div>`;
+                    
+                    tData.act.forEach(a => {
+                        let statusColor = a.status === 'realizada' ? '#10b981' : (a.status === 'en proceso' ? '#f59e0b' : '#ef4444');
+                        let actTitle = a.titulo.length > 40 ? a.titulo.substring(0,40) + '...' : a.titulo;
+                        
+                        // Extraemos los códigos crudos de las columnas tecnico1, etc.
+                        let tecnicosIds = [a.tecnico, a.tecnico1, a.tecnico2].filter(x => x && x !== 'ALL').join(' | ');
+                        let nombreCorto = a.ejecutor ? a.ejecutor.split(' ')[0] : 'S/A';
+
+                        htmlFinal += `
+                        <div class="gantt-card" style="border-left-color:${statusColor};" onclick="document.getElementById('btn_tab_list').click(); setTimeout(() => renderDetail('${a.key_id}'), 100);">
+                            <div style="font-weight:700; color:var(--primary); margin-bottom:4px; display:flex; justify-content:space-between;">
+                                <span>${a.ot || a.tag || '#'+a.id_real}</span>
+                                <span style="font-size:0.7rem; color:${statusColor};">${a.status.toUpperCase()}</span>
+                            </div>
+                            <div style="color:var(--secondary); margin-bottom:6px; line-height:1.3;">${actTitle}</div>
+                            <div style="color:var(--muted); font-size:0.7rem; display:flex; justify-content:space-between; align-items:flex-end;">
+                                <div style="display:flex; flex-direction:column;">
+                                    <span style="font-weight:600;">👷 ${nombreCorto}</span>
+                                    <span style="font-size:0.65rem; opacity:0.8;">[${tecnicosIds || 'Sin Códigos'}]</span>
+                                </div>
+                                <span style="font-weight:700; color:var(--text); background:#e2e8f0; padding:2px 6px; border-radius:4px;">⏱️ ${parseFloat(a.hh||0).toFixed(1)} HH</span>
+                            </div>
+                        </div>`;
+                    });
+                    htmlFinal += `</div>`;
+                }
+            });
+
+            htmlFinal += `</div></div>`;
+        });
+        
+        container.innerHTML = htmlFinal;
     }
 
     // --- EFECTO ANTIGRAVEDAD / PARTÍCULAS ---
