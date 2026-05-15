@@ -98,14 +98,13 @@ def main():
         
         print("   ⏳ Solicitando registros y adjuntos...")
         
-        # AGREGADAS LAS NUEVAS COLUMNAS CON LOS NOMBRES INTERNOS EXACTOS
         columnas_req = [
             "Id", "Title", "LinkTitle", "field_2", "field_3", "field_4", 
             "field_5", "field_6", "field_7", "Responsable", "field_10", 
             "field_11", "field_14", "field_15", "Antes", "Despues", 
             "field_1", "ClaseM", "Zona", "Planta", "Attachments", "AttachmentFiles", "HH", 
             "Duraci_x00f3_n_x0028_HR_x0029_", "CantidadPersonas",
-            "Dia", "Tecnico", "Tecnico2", "Tecnico3", "CRITICIDAD"
+            "Dia", "Tecnico", "Tecnico2", "Tecnico3", "CRITICIDAD", "Colaborador"
         ]
         
         try:
@@ -123,13 +122,11 @@ def main():
             p = item.properties
             
             semana_val = limpiar(p.get("field_1"))
-            # FILTRO ESTRICTO: Solo dejar semanas 19 y 20
             if semana_val not in ["19", "20"]:
                 continue
 
             item_id = int(p.get("Id", 0))
 
-            # ASIGNACIÓN DE PLANTA
             planta_raw = limpiar(p.get("Planta")).lower()
             planta_final = "carne" if "carne" in planta_raw else "masas"
 
@@ -143,18 +140,13 @@ def main():
             elif any(k in status_txt for k in ['proceso', 'tratando', 'curso']): status = "en proceso"
             else: status = "pendiente"
 
-            prio_raw = normalizar_texto(limpiar(p.get("field_10"))) 
-            if "calavera" in prio_raw or "0" in prio_raw: prio = "0"
-            elif "alta" in prio_raw or "1" in prio_raw: prio = "1"
-            elif "media" in prio_raw or "2" in prio_raw: prio = "2"
-            else: prio = "3"
-
-            # EXTRACCIÓN COLUMNA CRITICIDAD REAL (Corregido a CRITICIDAD en mayúsculas)
             crit_raw = normalizar_texto(limpiar(p.get("CRITICIDAD")))
             if "crit" in crit_raw: crit_final = "Critica"
             elif "mayor" in crit_raw: crit_final = "Mayor"
             elif "menor" in crit_raw: crit_final = "Menor"
             else: crit_final = "Sin Asignar"
+
+            colab_raw = limpiar(p.get("Colaborador")).strip().title()
 
             clase_str = limpiar(p.get("ClaseM")).title()
             clase_final = clase_str if clase_str and clase_str.lower() != "none" else "General"
@@ -181,6 +173,7 @@ def main():
                 "planta": planta_final,
                 "ejecutor": limpiar(p.get("Responsable")) or "Sin Asignar",
                 "criticidad": crit_final,
+                "colaborador": colab_raw or "Interno",
                 "ubicacion": limpiar(p.get("field_5")),
                 "sub_ubi": limpiar(p.get("field_6")),
                 "ot": limpiar(p.get("field_7")),
@@ -249,9 +242,7 @@ def generar_html_moderno(db_json):
         .app-layout { display: flex; height: calc(100vh - 110px); width: 100%; overflow: hidden; }
         
         .col-filters { width: 280px; background: #fff; border-right: 1px solid var(--border); display: flex; flex-direction: column; flex-shrink: 0; z-index: 5; }
-        
         .filters-header { padding: 15px 20px; border-bottom: 1px solid var(--border); font-weight: 700; color: var(--primary); font-size: 0.9rem; text-transform: uppercase; background: #f8fafc; display: flex; justify-content: space-between; align-items: center; }
-        
         .filters-body { flex: 1; overflow-y: auto; padding: 20px; min-height: 0; } 
         .filters-footer { padding: 20px; border-top: 1px solid var(--border); background: #f8fafc; flex-shrink: 0; }
         
@@ -567,6 +558,12 @@ def generar_html_moderno(db_json):
         
         html += createSelect('f_especialidad', '🧑‍🔧 Especialidad', ['Mecánico', 'Autómata', 'Frio', 'Infraestructura', 'Otros'].sort());
         
+        html += `<div class="f-group"><label>👥 Colaborador</label><select id="f_colaborador" onchange="applyFilters()">
+            <option value="ALL">Todos</option>
+            <option value="Interno">Interno</option>
+            <option value="Externo">Externo</option>
+        </select></div>`;
+
         html += createSelect('f_exec', '👷 Responsable', [...new Set(records.map(x=>x.ejecutor))].sort());
         html += createSelect('f_ubi', '🏭 Línea / Área', [...new Set(records.map(x=>x.ubicacion))].sort());
         
@@ -630,8 +627,8 @@ def generar_html_moderno(db_json):
         const semVal = document.getElementById('f_semana') ? document.getElementById('f_semana').value : 'ALL';
         const zVal = document.getElementById('f_zona') ? document.getElementById('f_zona').value : 'ALL';
         const espVal = document.getElementById('f_especialidad') ? document.getElementById('f_especialidad').value : 'ALL';
-        
         const critVal = document.getElementById('f_criticidad') ? document.getElementById('f_criticidad').value : 'ALL';
+        const colabVal = document.getElementById('f_colaborador') ? document.getElementById('f_colaborador').value : 'ALL';
         
         const searchVal = document.getElementById('search_input') ? document.getElementById('search_input').value.toLowerCase().trim() : '';
 
@@ -657,10 +654,9 @@ def generar_html_moderno(db_json):
             if (uVal !== 'ALL' && d.ubicacion !== uVal) return false;
             if (semVal !== 'ALL' && d.semana !== semVal) return false;
             if (zVal !== 'ALL' && d.zona !== zVal) return false;
-            
             if (espVal !== 'ALL' && getAreaResp(d.ejecutor) !== espVal) return false;
-            
             if (critVal !== 'ALL' && d.criticidad !== critVal) return false;
+            if (colabVal !== 'ALL' && d.colaborador !== colabVal) return false;
             
             return true;
         });
@@ -770,6 +766,7 @@ def generar_html_moderno(db_json):
         grid.innerHTML += createItem('📆 Semana', d.semana);
         grid.innerHTML += createItem('🧾 OT SAP', d.ot);
         grid.innerHTML += createItem('⚠️ Criticidad', d.criticidad);
+        grid.innerHTML += createItem('👥 Colaborador', d.colaborador);
         
         if (d.dia) grid.innerHTML += createItem('📅 Día Asignado', d.dia);
         let techsList = [d.tecnico, d.tecnico1, d.tecnico2].filter(t => t && t !== 'ALL').join(', ');
@@ -954,6 +951,7 @@ def generar_html_moderno(db_json):
             "Sub Ubicación": d.sub_ubi,
             "OT": d.ot,
             "Criticidad": d.criticidad,
+            "Colaborador": d.colaborador,
             "Ejecutor": d.ejecutor,
             "Status": d.status.toUpperCase(),
             "Observación": d.observacion,
@@ -973,8 +971,8 @@ def generar_html_moderno(db_json):
 
         const anchos = [
             { wch: 12 }, { wch: 12 }, { wch: 40 }, { wch: 15 }, { wch: 15 }, { wch: 15 }, { wch: 20 }, 
-            { wch: 20 }, { wch: 15 }, { wch: 15 }, { wch: 20 }, { wch: 15 }, { wch: 50 }, { wch: 10 }, 
-            { wch: 15 }, { wch: 10 }, { wch: 15 }, { wch: 15 }, { wch: 15 }, { wch: 15 }, { wch: 15 }
+            { wch: 20 }, { wch: 15 }, { wch: 15 }, { wch: 15 }, { wch: 20 }, { wch: 15 }, { wch: 50 }, 
+            { wch: 10 }, { wch: 15 }, { wch: 10 }, { wch: 15 }, { wch: 15 }, { wch: 15 }, { wch: 15 }
         ];
         worksheet['!cols'] = anchos;
 
