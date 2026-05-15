@@ -98,14 +98,14 @@ def main():
         
         print("   ⏳ Solicitando registros y adjuntos...")
         
-        # AGREGADAS LAS NUEVAS COLUMNAS: dia, tecnico, tecnico1, tecnico2
+        # AGREGADAS LAS NUEVAS COLUMNAS CON LOS NOMBRES INTERNOS EXACTOS
         columnas_req = [
             "Id", "Title", "LinkTitle", "field_2", "field_3", "field_4", 
             "field_5", "field_6", "field_7", "Responsable", "field_10", 
             "field_11", "field_14", "field_15", "Antes", "Despues", 
             "field_1", "ClaseM", "Zona", "Planta", "Attachments", "AttachmentFiles", "HH", 
             "Duraci_x00f3_n_x0028_HR_x0029_", "CantidadPersonas",
-            "dia", "tecnico", "tecnico1", "tecnico2"
+            "Dia", "Tecnico", "Tecnico2", "Tecnico3"
         ]
         
         try:
@@ -191,11 +191,11 @@ def main():
                 "hh": hh_val,
                 "duracion": duracion_val,
                 "dotacion": dotacion_val,
-                # NUEVAS COLUMNAS MAPEADAS
-                "dia": limpiar(p.get("dia")).title(),
-                "tecnico": limpiar(p.get("tecnico")).upper(),
-                "tecnico1": limpiar(p.get("tecnico1")).upper(),
-                "tecnico2": limpiar(p.get("tecnico2")).upper()
+                # NUEVAS COLUMNAS MAPEADAS CON SUS NOMBRES INTERNOS EXACTOS
+                "dia": limpiar(p.get("Dia")).title(),
+                "tecnico": limpiar(p.get("Tecnico")).upper(),
+                "tecnico1": limpiar(p.get("Tecnico2")).upper(),
+                "tecnico2": limpiar(p.get("Tecnico3")).upper()
             }
             
         print("\n ✅ Procesamiento finalizado. Construyendo HTML...")
@@ -359,7 +359,6 @@ def generar_html_moderno(db_json):
     <div class="top-bar">
         <div class="brand"><h2>⚙️ Panel Gestión de Actividades <span>SubGerencia de Mantenimiento</span></h2></div>
         
-        <!-- SWITCH DE PLANTA -->
         <div class="planta-switch">
             <span style="opacity:0.9;">Masas</span>
             <label class="switch">
@@ -379,8 +378,7 @@ def generar_html_moderno(db_json):
             <button class="tab-btn active" onclick="setView('list', this)" id="btn_tab_list">📋 Visor de OTs</button>
             <button class="tab-btn" onclick="setView('charts', this)">📊 Análisis y Tendencias</button>
             <button class="tab-btn" onclick="setView('row', this)">📈 ROW</button>
-            <button class="tab-btn" onclick="setView('gantt', this)">📅 Gantt / Turnos</button> <!-- NUEVO BOTÓN GANTT -->
-        </div>
+            <button class="tab-btn" onclick="setView('gantt', this)">📅 Gantt / Turnos</button> </div>
         <div style="display:flex; gap:10px;">
             <button onclick="descargarExcel()" class="btn-clean" style="margin: 0; padding: 8px 15px; width: auto; border-color: #10b981; color: #10b981; display: flex; align-items: center; gap: 8px;" title="Descargar datos filtrados">
                 <span style="font-size:1.2rem;">📊</span> Exportar Excel
@@ -489,14 +487,12 @@ def generar_html_moderno(db_json):
             </div>
         </div>
 
-        <!-- NUEVA VISTA GANTT / TURNOS -->
         <div id="view_gantt" style="display:none; flex:1; flex-direction:column; overflow-y:auto; padding:30px; background:#f8fafc;">
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px; flex-wrap:wrap; gap:15px;">
                 <h2 style="color:var(--primary); margin:0; font-size:1.8rem;">Planificación de Turnos y Carga Técnica</h2>
             </div>
             <div id="gantt_container" style="display:flex; gap:20px; overflow-x:auto; padding-bottom:15px; flex:1;">
-                <!-- Días inyectados vía JS -->
-            </div>
+                </div>
         </div>
 
     </div>
