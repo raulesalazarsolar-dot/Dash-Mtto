@@ -1539,7 +1539,8 @@ def generar_html_moderno(db_json):
             return;
         }
 
-        const diasOrden = ['Lunes', 'Martes', 'Miercoles', 'Jueves', 'Viernes', 'Sabado', 'Domingo'];
+        // --- CAMBIO 1: ORDEN DE LOS DÍAS ---
+        const diasOrden = ['Jueves', 'Viernes', 'Sabado', 'Domingo', 'Lunes', 'Martes', 'Miercoles'];
         
         let schedule = {};
         diasOrden.forEach(d => {
@@ -1549,23 +1550,34 @@ def generar_html_moderno(db_json):
                     'Mañana': { hh: 0, act: [] }, 
                     'Tarde': { hh: 0, act: [] }, 
                     'Noche': { hh: 0, act: [] }, 
+                    'Cuarto Turno': { hh: 0, act: [] },
+                    'Externos y Otros': { hh: 0, act: [] },
                     'Sin Turno Asignado': { hh: 0, act: [] } 
                 }
             };
         });
 
-        // Lógica de clasificación de turnos usando las variables exactas solicitadas (MM1, MT2, MN3...)
+        // --- CAMBIO 2: LÓGICA DE CLASIFICACIÓN USANDO REGEX ---
         const getShift = (t1, t2, t3) => {
             let combo = (String(t1) + " " + String(t2) + " " + String(t3)).toUpperCase();
-            if (combo.includes('MM')) return 'Mañana';
-            if (combo.includes('MT')) return 'Tarde';
-            if (combo.includes('MN')) return 'Noche';
+            
+            if (/(AM[1-3]|MM[1-3])/.test(combo)) return 'Mañana';
+            if (/(AT[1-3]|MT[1-3])/.test(combo)) return 'Tarde';
+            if (/(AN[1-3]|MN[1-3])/.test(combo)) return 'Noche';
+            if (/(M4[1-3])/.test(combo)) return 'Cuarto Turno';
+            if (/(MEX[1-8]|LUB)/.test(combo)) return 'Externos y Otros';
+            
+            // Fallback genérico para atrapar combinaciones simples
+            if (combo.includes('MM') || combo.includes('AM')) return 'Mañana';
+            if (combo.includes('MT') || combo.includes('AT')) return 'Tarde';
+            if (combo.includes('MN') || combo.includes('AN')) return 'Noche';
+            
             return 'Sin Turno Asignado';
         };
 
         const normalizarDia = (d) => {
             if(!d || d === 'ALL') return 'Sin Día Asignado';
-            let lower = String(d).toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, ""); // quita tildes
+            let lower = String(d).toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, ""); 
             if(lower.includes('lun')) return 'Lunes';
             if(lower.includes('mar')) return 'Martes';
             if(lower.includes('mier')) return 'Miercoles';
@@ -1578,9 +1590,12 @@ def generar_html_moderno(db_json):
 
         data.forEach(item => {
             let d = normalizarDia(item.dia);
-            // Si tiene un día no tipificado, lo agregamos dinámicamente
+            
             if (!schedule[d]) {
-                schedule[d] = { totalHH: 0, turnos: { 'Mañana': { hh: 0, act: [] }, 'Tarde': { hh: 0, act: [] }, 'Noche': { hh: 0, act: [] }, 'Sin Turno Asignado': { hh: 0, act: [] } } };
+                schedule[d] = { 
+                    totalHH: 0, 
+                    turnos: { 'Mañana': { hh: 0, act: [] }, 'Tarde': { hh: 0, act: [] }, 'Noche': { hh: 0, act: [] }, 'Cuarto Turno': { hh: 0, act: [] }, 'Externos y Otros': { hh: 0, act: [] }, 'Sin Turno Asignado': { hh: 0, act: [] } } 
+                };
                 if (!diasOrden.includes(d)) diasOrden.push(d);
             }
             
@@ -1592,14 +1607,15 @@ def generar_html_moderno(db_json):
             schedule[d].turnos[shift].act.push(item);
         });
 
-        // Generar Columnas HTML para el Kanban/Gantt
         let htmlFinal = "";
         diasOrden.forEach(dia => {
             let dayData = schedule[dia];
             if(!dayData) return;
             
-            // Ocultamos la columna si el día no tiene nada programado para ahorrar espacio visual
-            let isEmpty = (dayData.turnos['Mañana'].act.length === 0 && dayData.turnos['Tarde'].act.length === 0 && dayData.turnos['Noche'].act.length === 0 && dayData.turnos['Sin Turno Asignado'].act.length === 0);
+            let turnosArr = Object.values(dayData.turnos);
+            let isEmpty = turnosArr.every(t => t.act.length === 0);
+            
+            // Ocultamos la columna vacía solo si es Fin de Semana o Sin Asignar
             if (isEmpty && (dia === 'Sabado' || dia === 'Domingo' || dia === 'Sin Día Asignado')) return; 
 
             htmlFinal += `<div class="gantt-day-col">
@@ -1609,10 +1625,16 @@ def generar_html_moderno(db_json):
                 </div>
                 <div style="padding:15px; display:flex; flex-direction:column; overflow-y:auto; flex:1; background:#f8fafc;">`;
 
-            ['Mañana', 'Tarde', 'Noche', 'Sin Turno Asignado'].forEach(turno => {
+            // --- CAMBIO 3: RENDERIZAR TODOS LOS TURNOS ---
+            ['Mañana', 'Tarde', 'Noche', 'Cuarto Turno', 'Externos y Otros', 'Sin Turno Asignado'].forEach(turno => {
                 let tData = dayData.turnos[turno];
                 if (tData.act.length > 0) {
-                    let tColor = turno==='Mañana' ? '#3b82f6' : (turno==='Tarde' ? '#f59e0b' : (turno==='Noche' ? '#8b5cf6' : '#94a3b8'));
+                    let tColor = '#94a3b8'; // Defecto gris
+                    if (turno === 'Mañana') tColor = '#3b82f6'; // Azul
+                    else if (turno === 'Tarde') tColor = '#f59e0b'; // Naranja
+                    else if (turno === 'Noche') tColor = '#8b5cf6'; // Morado
+                    else if (turno === 'Cuarto Turno') tColor = '#ec4899'; // Rosado
+                    else if (turno === 'Externos y Otros') tColor = '#14b8a6'; // Verde Agua
                     
                     htmlFinal += `
                     <div class="gantt-shift-box" style="border:1px solid ${tColor}40; background:${tColor}10;">
@@ -1625,7 +1647,6 @@ def generar_html_moderno(db_json):
                         let statusColor = a.status === 'realizada' ? '#10b981' : (a.status === 'en proceso' ? '#f59e0b' : '#ef4444');
                         let actTitle = a.titulo.length > 40 ? a.titulo.substring(0,40) + '...' : a.titulo;
                         
-                        // Extraemos los códigos crudos de las columnas tecnico1, etc.
                         let tecnicosIds = [a.tecnico, a.tecnico1, a.tecnico2].filter(x => x && x !== 'ALL').join(' | ');
                         let nombreCorto = a.ejecutor ? a.ejecutor.split(' ')[0] : 'S/A';
 
