@@ -98,13 +98,14 @@ def main():
         
         print("   ⏳ Solicitando registros y adjuntos...")
         
+        # AGREGADAS LAS NUEVAS COLUMNAS CON LOS NOMBRES INTERNOS EXACTOS
         columnas_req = [
             "Id", "Title", "LinkTitle", "field_2", "field_3", "field_4", 
             "field_5", "field_6", "field_7", "Responsable", "field_10", 
             "field_11", "field_14", "field_15", "Antes", "Despues", 
             "field_1", "ClaseM", "Zona", "Planta", "Attachments", "AttachmentFiles", "HH", 
             "Duraci_x00f3_n_x0028_HR_x0029_", "CantidadPersonas",
-            "Dia", "Tecnico", "Tecnico2", "Tecnico3", "Criticidad"
+            "Dia", "Tecnico", "Tecnico2", "Tecnico3", "CRITICIDAD"
         ]
         
         try:
@@ -122,11 +123,13 @@ def main():
             p = item.properties
             
             semana_val = limpiar(p.get("field_1"))
+            # FILTRO ESTRICTO: Solo dejar semanas 19 y 20
             if semana_val not in ["19", "20"]:
                 continue
 
             item_id = int(p.get("Id", 0))
 
+            # ASIGNACIÓN DE PLANTA
             planta_raw = limpiar(p.get("Planta")).lower()
             planta_final = "carne" if "carne" in planta_raw else "masas"
 
@@ -140,7 +143,14 @@ def main():
             elif any(k in status_txt for k in ['proceso', 'tratando', 'curso']): status = "en proceso"
             else: status = "pendiente"
 
-            crit_raw = normalizar_texto(limpiar(p.get("Criticidad")))
+            prio_raw = normalizar_texto(limpiar(p.get("field_10"))) 
+            if "calavera" in prio_raw or "0" in prio_raw: prio = "0"
+            elif "alta" in prio_raw or "1" in prio_raw: prio = "1"
+            elif "media" in prio_raw or "2" in prio_raw: prio = "2"
+            else: prio = "3"
+
+            # EXTRACCIÓN COLUMNA CRITICIDAD REAL (Corregido a CRITICIDAD en mayúsculas)
+            crit_raw = normalizar_texto(limpiar(p.get("CRITICIDAD")))
             if "crit" in crit_raw: crit_final = "Critica"
             elif "mayor" in crit_raw: crit_final = "Mayor"
             elif "menor" in crit_raw: crit_final = "Menor"
