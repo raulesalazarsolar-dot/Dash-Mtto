@@ -213,8 +213,7 @@ def generar_html_moderno(db_json):
     
     html_template = """<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Dashboard Mantenimiento</title>
     <link rel="icon" type="image/x-icon" href="https://www.walmart.com/favicon.ico">
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.0.0"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
@@ -1808,6 +1807,7 @@ def generar_html_moderno(db_json):
 
     full_html = html_template.replace("__FECHA_ACTUAL__", fecha_actual)
     full_html = full_html.replace("__DB_JSON_DATA__", json.dumps(db_json))
+    full_html = full_html.replace('\xa0', ' ')
     
     with open(OUTPUT_HTML, "w", encoding="utf-8") as f: 
         f.write(full_html)
