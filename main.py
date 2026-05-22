@@ -122,7 +122,7 @@ def main():
             p = item.properties
             
             semana_val = limpiar(p.get("field_1"))
-            if semana_val not in ["19", "20"]:
+            if semana_val not in ["20", "21"]:
                 continue
 
             item_id = int(p.get("Id", 0))
