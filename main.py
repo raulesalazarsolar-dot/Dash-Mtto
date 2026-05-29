@@ -122,7 +122,7 @@ def main():
             p = item.properties
             
             semana_val = limpiar(p.get("field_1"))
-            if semana_val not in ["20", "21"]:
+            if semana_val not in ["21", "22"]:
                 continue
 
             item_id = int(p.get("Id", 0))
@@ -553,7 +553,7 @@ def generar_html_moderno(db_json):
         };
 
         let html = '';
-        html += createSelect('f_semana', '📆 Semana', weeks, '20');
+        html += createSelect('f_semana', '📆 Semana', weeks, '22');
         html += createSelect('f_zona', '📍 Zona', [...new Set(records.map(x=>x.zona))].filter(Boolean).sort());
         html += createSelect('f_clase', '🛠️ Clase MTTO', [...new Set(records.map(x=>x.clase))].sort());
         
@@ -590,7 +590,7 @@ def generar_html_moderno(db_json):
     function resetFilters() {
         if(document.getElementById('search_input')) document.getElementById('search_input').value = '';
         document.querySelectorAll('.f-group select').forEach(sel => sel.value = "ALL");
-        if(document.getElementById('f_semana')) document.getElementById('f_semana').value = "20"; 
+        if(document.getElementById('f_semana')) document.getElementById('f_semana').value = "22"; 
         applyFilters();
     }
 
