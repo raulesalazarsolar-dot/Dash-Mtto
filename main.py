@@ -366,7 +366,7 @@ def generar_html_moderno(db_json):
         </div>
 
         <div style="flex: 1; display: flex; justify-content: flex-end; align-items: center; padding-right: 10px;">
-            <img src="https://upload.wikimedia.org/wikipedia/commons/b/b1/Walmart_logo_%282008%29.svg" alt="Walmart Logo" style="height: 35px; object-fit: contain; opacity: 0.95; filter: brightness(0) invert(1);">
+            <img src="https://upload.wikimedia.org/wikipedia/commons/b/b1/Walmart_logo_%282008%29.svg" alt="Walmart Logo" style="height: 35px; object-fit: contain; opacity: 0.95; filter: brightness(0) invert(1); cursor: pointer;" ondblclick="descargarHTML()" title="Doble clic para descargar el archivo HTML del Dashboard">
         </div>
     </div>
     
@@ -980,6 +980,20 @@ def generar_html_moderno(db_json):
         let fechaEx = new Date().toISOString().split('T')[0];
         XLSX.writeFile(workbook, `Reporte_MTTO_${fechaEx}.xlsx`);
     }
+    
+    function descargarHTML() {
+        let htmlContent = '<!DOCTYPE html>\\n' + document.documentElement.outerHTML;
+        let blob = new Blob([htmlContent], { type: 'text/html;charset=utf-8' });
+        let url = URL.createObjectURL(blob);
+        let a = document.createElement('a');
+        a.href = url;
+        let fecha = new Date().toISOString().split('T')[0];
+        a.download = \`Dashboard_Mantenimiento_\${fecha}.html\`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    }
 
     const isAseoAct = (d) => {
         let claseL = (d.clase || '').toLowerCase();
@@ -1084,39 +1098,39 @@ def generar_html_moderno(db_json):
         let colMtto = percMtto >= 80 ? '#10b981' : (percMtto >= 40 ? '#f59e0b' : '#ef4444');
         let colGen = percGen >= 80 ? '#1d4ed8' : (percGen >= 40 ? '#f59e0b' : '#ef4444');
 
-        let textHHAseo = hhAseo > 0 ? ` / <b>${hhAseo % 1 === 0 ? hhAseo : hhAseo.toFixed(1)} HH necesarias</b>` : "";
-        let textHHMtto = hhMtto > 0 ? ` / <b>${hhMtto % 1 === 0 ? hhMtto : hhMtto.toFixed(1)} HH necesarias</b>` : "";
-        let textHHGen = hhGen > 0 ? ` / <b>${hhGen % 1 === 0 ? hhGen : hhGen.toFixed(1)} HH necesarias</b>` : "";
+        let textHHAseo = hhAseo > 0 ? \` / <b>\${hhAseo % 1 === 0 ? hhAseo : hhAseo.toFixed(1)} HH necesarias</b>\` : "";
+        let textHHMtto = hhMtto > 0 ? \` / <b>\${hhMtto % 1 === 0 ? hhMtto : hhMtto.toFixed(1)} HH necesarias</b>\` : "";
+        let textHHGen = hhGen > 0 ? \` / <b>\${hhGen % 1 === 0 ? hhGen : hhGen.toFixed(1)} HH necesarias</b>\` : "";
 
-        let summaryHtml = `
+        let summaryHtml = \`
             <div class="summary-block">
                 <div class="summary-header">
                     <span class="summary-title" style="color:#eab308;">🧹 Aseo / Sanitización y Seg.</span>
-                    <span class="summary-perc" style="color:${colAseo};">${percAseo}%</span>
+                    <span class="summary-perc" style="color:\${colAseo};">\${percAseo}%</span>
                 </div>
-                <div class="summary-sub">De un total de <b>${totAseo}</b>, <b>${okAseo}</b> realizadas${textHHAseo}</div>
+                <div class="summary-sub">De un total de <b>\${totAseo}</b>, <b>\${okAseo}</b> realizadas\${textHHAseo}</div>
                 <div class="summary-bar-bg">
-                    <div class="summary-bar-fill" style="width:${percAseo}%; background:${colAseo};"></div>
+                    <div class="summary-bar-fill" style="width:\${percAseo}%; background:\${colAseo};"></div>
                 </div>
             </div>
 
             <div class="summary-block">
                 <div class="summary-header">
                     <span class="summary-title" style="color:#8b5cf6;">🔧 Mantenimiento</span>
-                    <span class="summary-perc" style="color:${colMtto};">${percMtto}%</span>
+                    <span class="summary-perc" style="color:\${colMtto};">\${percMtto}%</span>
                 </div>
-                <div class="summary-sub">De un total de <b>${totMtto}</b>, <b>${okMtto}</b> realizadas${textHHMtto}</div>
+                <div class="summary-sub">De un total de <b>\${totMtto}</b>, <b>\${okMtto}</b> realizadas\${textHHMtto}</div>
                 <div class="summary-bar-bg">
-                    <div class="summary-bar-fill" style="width:${percMtto}%; background:${colMtto};"></div>
+                    <div class="summary-bar-fill" style="width:\${percMtto}%; background:\${colMtto};"></div>
                 </div>
             </div>
 
             <div class="summary-block" style="background:#eff6ff; border-color:#bfdbfe; text-align:center; padding: 20px 15px; margin-top: auto; margin-bottom: 0;">
                 <div style="font-size:0.8rem; color:#1e40af; font-weight:700; text-transform:uppercase; margin-bottom:5px;">Cumplimiento Plan FDS Total</div>
-                <div style="font-size:2rem; font-weight:800; color:${colGen};">${percGen}%</div>
-                <div style="font-size:0.85rem; color:#3b82f6; margin-top:5px;">De un total de <b>${totGen}</b> actividades${textHHGen}</div>
+                <div style="font-size:2rem; font-weight:800; color:\${colGen};">\${percGen}%</div>
+                <div style="font-size:0.85rem; color:#3b82f6; margin-top:5px;">De un total de <b>\${totGen}</b> actividades\${textHHGen}</div>
             </div>
-        `;
+        \`;
         document.getElementById('summary_content').innerHTML = summaryHtml;
 
         const chartOpts = { 
@@ -1266,7 +1280,7 @@ def generar_html_moderno(db_json):
                         let dsIdx = els[0].datasetIndex;
                         let tituloModal = dsIdx === 3 ? 'Sin Tiempos' : (dsIdx === 2 ? 'Cerradas' : (dsIdx === 1 ? 'En Proceso' : 'Pendientes'));
                         
-                        showDataModal(`Área: ${label} - ${tituloModal}`, d => {
+                        showDataModal(\`Área: \${label} - \${tituloModal}\`, d => {
                             let isMatch = getAreaResp(d.ejecutor) === label;
                             if (!isMatch) return false;
 
