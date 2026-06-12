@@ -344,33 +344,6 @@ def generar_html_moderno(db_json):
         .gantt-shift-header { display:flex; justify-content:space-between; font-weight:700; font-size:0.85rem; margin-bottom:10px; padding-bottom:6px; text-transform:uppercase; }
         .gantt-card { background:white; border-left:4px solid transparent; padding:10px; margin-bottom:8px; border-radius:6px; font-size:0.8rem; cursor:pointer; box-shadow:0 2px 4px rgba(0,0,0,0.06); transition:transform 0.15s; }
         .gantt-card:hover { transform: translateY(-2px); box-shadow:0 4px 6px rgba(0,0,0,0.1); }
-        
-        /* ==========================================
-           COMPATIBILIDAD MÓVIL (RESPONSIVE)
-           ========================================== */
-        @media screen and (max-width: 900px) {
-            body { height: auto; overflow: auto; }
-            .app-layout { flex-direction: column; height: auto; overflow: visible; }
-            .top-bar { height: auto; flex-direction: column; padding: 15px; gap: 10px; text-align: center; }
-            .brand h2 { justify-content: center; flex-wrap: wrap; }
-            .planta-switch { width: 100%; justify-content: center; }
-            .tabs-container { flex-direction: column; gap: 10px; padding: 15px; height: auto; }
-            .tabs-nav { flex-wrap: wrap; justify-content: center; }
-            .col-filters { width: 100%; border-right: none; border-bottom: 2px solid var(--border); max-height: 350px; }
-            .col-list { width: 100%; border-right: none; border-bottom: 2px solid var(--border); max-height: 400px; }
-            #view_list { flex-direction: column; overflow: visible; }
-            .col-detail { padding: 15px; overflow: visible; }
-            .data-grid { grid-template-columns: 1fr 1fr; padding: 15px; }
-            .dh-top { flex-direction: column; align-items: flex-start; gap: 10px; }
-            .graficos-layout { grid-template-columns: 1fr; padding: 15px; gap: 15px; }
-            .chart-card, .chart-card.wide { height: auto; min-height: 350px; min-width: 100% !important; margin-bottom: 15px; }
-            #view_row > div { flex-direction: column; width: 100%; gap: 15px; }
-            #view_row, #view_gantt { padding: 15px; }
-            .gantt-day-col { min-width: 100%; }
-            .dm-header { flex-direction: column; gap: 10px; text-align: center; }
-            .dm-close { position: absolute; right: 15px; top: 15px; }
-            .dm-table { display: block; overflow-x: auto; white-space: nowrap; }
-        }
     </style>
 </head>
 <body>
@@ -1009,7 +982,7 @@ def generar_html_moderno(db_json):
     }
 
     function descargarHTML() {
-        var htmlContent = '<!DOCTYPE html>\n' + document.documentElement.outerHTML;
+        var htmlContent = '<!DOCTYPE html>\\n' + document.documentElement.outerHTML;
         var blob = new Blob([htmlContent], { type: 'text/html;charset=utf-8' });
         var url = URL.createObjectURL(blob);
         var a = document.createElement('a');
