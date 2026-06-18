@@ -122,7 +122,7 @@ def main():
             p = item.properties
             
             semana_val = limpiar(p.get("field_1"))
-            if semana_val not in ["23", "24"]:
+            if semana_val not in ["24", "25"]:
                 continue
 
             item_id = int(p.get("Id", 0))
@@ -553,7 +553,7 @@ def generar_html_moderno(db_json):
         };
 
         let html = '';
-        html += createSelect('f_semana', '📆 Semana', weeks, '24');
+        html += createSelect('f_semana', '📆 Semana', weeks, '25');
         html += createSelect('f_zona', '📍 Zona', [...new Set(records.map(x=>x.zona))].filter(Boolean).sort());
         html += createSelect('f_clase', '🛠️ Clase MTTO', [...new Set(records.map(x=>x.clase))].sort());
         
