@@ -451,12 +451,7 @@ def generar_html_moderno(db_json):
                 <div class="chart-title">Resumen de Actividades</div>
                 <div id="summary_content" style="display:flex; flex-direction:column; justify-content:space-around; flex:1;"></div>
             </div>
-            
-            <div class="chart-card wide">
-                <div class="chart-title">Desglose de Tiempos (HH) por Área</div>
-                <div class="canvas-container"><canvas id="chart_hh_area"></canvas></div>
-            </div>            
-            
+                        
             <div class="chart-card wide"><div class="chart-title">Avance por Área</div><div class="canvas-container"><canvas id="chart5"></canvas></div></div>
             
             <div class="chart-card wide"><div class="chart-title">Top Ubicaciones Críticas</div><div class="canvas-container"><canvas id="chart4"></canvas></div></div>
@@ -1214,84 +1209,6 @@ def generar_html_moderno(db_json):
                     } 
                 }, 
                 onClick: (e, els, ch) => { if(els.length>0) showDataModal(ch.data.labels[els[0].index], d => d.clase === ch.data.labels[els[0].index]); } 
-            }
-        });
-        
-        let statsAreaHH = {
-            'Mecánico': { ok: 0, proc: 0, pend: 0, sin_hh: 0 },
-            'Autómata': { ok: 0, proc: 0, pend: 0, sin_hh: 0 },
-            'Frio': { ok: 0, proc: 0, pend: 0, sin_hh: 0 },
-            'Infraestructura': { ok: 0, proc: 0, pend: 0, sin_hh: 0 }
-        };
-        
-        data.forEach(d => {
-            let a = getAreaResp(d.ejecutor);
-            if (statsAreaHH[a]) {
-                let hh = parseFloat(d.hh) || 0;
-                if (hh > 0) {
-                    if (d.status === 'realizada') statsAreaHH[a].ok += hh;
-                    else if (d.status === 'en proceso') statsAreaHH[a].proc += hh;
-                    else statsAreaHH[a].pend += hh; 
-                } else {
-                    statsAreaHH[a].sin_hh += 1; 
-                }
-            }
-        });
-
-        let labelsAreaHH = Object.keys(statsAreaHH).sort((a, b) => {
-            let totA = statsAreaHH[a].ok + statsAreaHH[a].proc + statsAreaHH[a].pend;
-            let totB = statsAreaHH[b].ok + statsAreaHH[b].proc + statsAreaHH[b].pend;
-            return totB - totA;
-        });
-
-        new Chart(getFreshCanvas('chart_hh_area'), {
-            type: 'bar',
-            data: {
-                labels: labelsAreaHH,
-                datasets: [
-                    { label: 'Pendientes (HH)', data: labelsAreaHH.map(l => statsAreaHH[l].pend), backgroundColor: '#ef4444', borderRadius: 4, barPercentage: 0.7 },
-                    { label: 'En Proceso (HH)', data: labelsAreaHH.map(l => statsAreaHH[l].proc), backgroundColor: '#f59e0b', borderRadius: 4, barPercentage: 0.7 },
-                    { label: 'Cerradas (HH)', data: labelsAreaHH.map(l => statsAreaHH[l].ok), backgroundColor: '#10b981', borderRadius: 4, barPercentage: 0.7 },
-                    { label: 'Sin Tiempo (Cant. OTs)', data: labelsAreaHH.map(l => statsAreaHH[l].sin_hh), backgroundColor: '#94a3b8', borderRadius: 4, barPercentage: 0.7 } 
-                ]
-            },
-            options: {
-                ...chartOpts,
-                indexAxis: 'y',
-                scales: {
-                    x: { stacked: true, grid: { color: '#f1f5f9' } },
-                    y: { stacked: true, grid: { display: false } }
-                },
-                plugins: {
-                    legend: { position: 'top', labels: { usePointStyle: true } },
-                    datalabels: {
-                        display: (ctx) => ctx.dataset.data[ctx.dataIndex] > 0,
-                        color: '#fff',
-                        font: { weight: 'bold', size: 12 },
-                        formatter: (value, ctx) => {
-                            if (ctx.datasetIndex === 3) return value + ' OTs'; 
-                            return (value % 1 === 0 ? value : value.toFixed(1)) + 'h'; 
-                        }
-                    }
-                },
-                onClick: (e, els, ch) => {
-                    if (els.length > 0) {
-                        let label = ch.data.labels[els[0].index];
-                        let dsIdx = els[0].datasetIndex;
-                        let tituloModal = dsIdx === 3 ? 'Sin Tiempos' : (dsIdx === 2 ? 'Cerradas' : (dsIdx === 1 ? 'En Proceso' : 'Pendientes'));
-                        
-                        showDataModal('Área: ' + label + ' - ' + tituloModal, d => {
-                            let isMatch = getAreaResp(d.ejecutor) === label;
-                            if (!isMatch) return false;
-
-                            let hh = parseFloat(d.hh) || 0;
-                            if (dsIdx === 3) return hh === 0; 
-                            if (dsIdx === 2) return d.status === 'realizada' && hh > 0;
-                            if (dsIdx === 1) return d.status === 'en proceso' && hh > 0;
-                            return d.status !== 'realizada' && d.status !== 'en proceso' && hh > 0;
-                        });
-                    }
-                }
             }
         });
 
